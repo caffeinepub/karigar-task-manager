@@ -1,0 +1,268 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Playfair Display (Display) ── */
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/assets/fonts/PlayfairDisplay[wght].woff2") format("woff2");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Figtree (Body) ── */
+@font-face {
+  font-family: "Figtree";
+  src: url("/assets/fonts/Figtree[wght].woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* ── Jewelry Gold Light Theme ── */
+    /* Background: warm ivory parchment */
+    --background: 0.97 0.012 85;
+    --foreground: 0.18 0.03 50;
+
+    /* Card: crisp white with warm undertone */
+    --card: 0.995 0.006 80;
+    --card-foreground: 0.18 0.03 50;
+
+    /* Popover */
+    --popover: 0.995 0.006 80;
+    --popover-foreground: 0.18 0.03 50;
+
+    /* Primary: rich jeweler's gold */
+    --primary: 0.72 0.148 60;
+    --primary-foreground: 0.12 0.025 45;
+
+    /* Secondary: warm champagne */
+    --secondary: 0.93 0.035 78;
+    --secondary-foreground: 0.28 0.04 55;
+
+    /* Muted: warm stone */
+    --muted: 0.93 0.018 75;
+    --muted-foreground: 0.52 0.03 60;
+
+    /* Accent: deep burnished gold */
+    --accent: 0.88 0.06 78;
+    --accent-foreground: 0.22 0.04 50;
+
+    /* Destructive */
+    --destructive: 0.58 0.22 25;
+    --destructive-foreground: 0.98 0 0;
+
+    /* Border & Input */
+    --border: 0.86 0.04 75;
+    --input: 0.86 0.04 75;
+    --ring: 0.72 0.148 60;
+
+    /* Gold shades for custom use */
+    --gold-light: 0.88 0.11 80;
+    --gold-mid: 0.78 0.138 65;
+    --gold-deep: 0.62 0.14 50;
+    --gold-shine: 0.92 0.10 82;
+    --brown-deep: 0.25 0.04 55;
+    --brown-mid: 0.38 0.05 55;
+    --parchment: 0.97 0.018 82;
+
+    /* Charts */
+    --chart-1: 0.72 0.148 60;
+    --chart-2: 0.62 0.12 200;
+    --chart-3: 0.55 0.08 230;
+    --chart-4: 0.82 0.14 84;
+    --chart-5: 0.65 0.18 35;
+
+    /* Sidebar */
+    --sidebar: 0.22 0.035 50;
+    --sidebar-foreground: 0.92 0.03 75;
+    --sidebar-primary: 0.72 0.148 60;
+    --sidebar-primary-foreground: 0.12 0.025 45;
+    --sidebar-accent: 0.30 0.04 55;
+    --sidebar-accent-foreground: 0.92 0.03 75;
+    --sidebar-border: 0.32 0.04 50;
+    --sidebar-ring: 0.72 0.148 60;
+  }
+
+  .dark {
+    /* Background: deep walnut brown */
+    --background: 0.16 0.025 50;
+    --foreground: 0.94 0.022 78;
+
+    --card: 0.21 0.03 52;
+    --card-foreground: 0.94 0.022 78;
+
+    --popover: 0.24 0.035 53;
+    --popover-foreground: 0.94 0.022 78;
+
+    /* Primary: gleaming gold */
+    --primary: 0.78 0.148 65;
+    --primary-foreground: 0.12 0.02 45;
+
+    /* Secondary */
+    --secondary: 0.26 0.035 52;
+    --secondary-foreground: 0.88 0.025 75;
+
+    /* Muted */
+    --muted: 0.26 0.025 52;
+    --muted-foreground: 0.62 0.04 68;
+
+    /* Accent: warm rose gold */
+    --accent: 0.35 0.055 55;
+    --accent-foreground: 0.94 0.022 78;
+
+    --destructive: 0.65 0.2 20;
+    --destructive-foreground: 0.98 0 0;
+
+    --border: 0.30 0.04 52;
+    --input: 0.30 0.04 52;
+    --ring: 0.78 0.148 65;
+
+    --gold-light: 0.88 0.11 80;
+    --gold-mid: 0.78 0.138 65;
+    --gold-deep: 0.62 0.14 50;
+    --gold-shine: 0.92 0.10 82;
+    --brown-deep: 0.25 0.04 55;
+    --brown-mid: 0.38 0.05 55;
+    --parchment: 0.97 0.018 82;
+
+    --chart-1: 0.78 0.148 65;
+    --chart-2: 0.68 0.14 200;
+    --chart-3: 0.72 0.12 230;
+    --chart-4: 0.82 0.14 84;
+    --chart-5: 0.72 0.18 35;
+
+    --sidebar: 0.19 0.028 50;
+    --sidebar-foreground: 0.92 0.03 75;
+    --sidebar-primary: 0.78 0.148 65;
+    --sidebar-primary-foreground: 0.12 0.02 45;
+    --sidebar-accent: 0.26 0.035 52;
+    --sidebar-accent-foreground: 0.92 0.03 75;
+    --sidebar-border: 0.28 0.035 50;
+    --sidebar-ring: 0.78 0.148 65;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+    font-feature-settings: "kern" 1, "liga" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3 {
+    font-family: "Playfair Display", Georgia, serif;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Playfair Display", Georgia, serif;
+  }
+
+  .font-body {
+    font-family: "Figtree", "Trebuchet MS", sans-serif;
+  }
+
+  /* Gold gradient text */
+  .text-gold-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.88 0.14 78) 0%,
+      oklch(0.72 0.148 60) 40%,
+      oklch(0.82 0.13 72) 70%,
+      oklch(0.68 0.14 55) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Ornamental divider */
+  .ornament-line {
+    position: relative;
+  }
+
+  .ornament-line::before,
+  .ornament-line::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 35%;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      oklch(0.72 0.148 60 / 0.6)
+    );
+  }
+
+  .ornament-line::before {
+    right: 55%;
+    background: linear-gradient(
+      to left,
+      transparent,
+      oklch(0.72 0.148 60 / 0.6)
+    );
+  }
+
+  .ornament-line::after {
+    left: 55%;
+  }
+
+  /* Subtle noise texture overlay */
+  .noise-bg {
+    position: relative;
+  }
+
+  .noise-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  /* Step connector line */
+  .step-connector {
+    height: 2px;
+    background: linear-gradient(
+      to right,
+      oklch(0.72 0.148 60),
+      oklch(0.82 0.13 72)
+    );
+  }
+
+  /* Gold border glow */
+  .gold-glow {
+    box-shadow: 0 0 0 1px oklch(0.72 0.148 60 / 0.3),
+                0 4px 16px oklch(0.72 0.148 60 / 0.15);
+  }
+
+  /* Shimmer animation */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.92 0.10 82 / 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+}
