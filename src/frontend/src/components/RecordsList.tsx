@@ -41,7 +41,11 @@ import {
   useDeleteJobRecord,
   useGetAllJobRecords,
 } from "../hooks/useQueries";
-import { type StockOutEntry, useStock } from "../hooks/useStock";
+import {
+  type BuybackEntry,
+  type StockOutEntry,
+  useStock,
+} from "../hooks/useStock";
 import EmployeeForm from "./EmployeeForm";
 import JobDetailModal from "./JobDetailModal";
 
@@ -418,6 +422,19 @@ export default function RecordsList({
                       0,
                     );
 
+                  const scrapWeight = stockEntries
+                    .filter(
+                      (e) => e.type === "buyback" && e.material === material,
+                    )
+                    .reduce((sum, e) => {
+                      return (
+                        sum +
+                        (Number.parseFloat(
+                          (e as BuybackEntry).totalScrapWeight,
+                        ) || 0)
+                      );
+                    }, 0);
+
                   const netWeight = inWeight - outWeight;
                   const netPositive = netWeight >= 0;
 
@@ -447,6 +464,12 @@ export default function RecordsList({
                         {"  "}Out:{" "}
                         <span className="font-medium text-foreground">
                           {outCount} ({outWeight.toFixed(2)}g)
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Scrap:{" "}
+                        <span className="font-medium text-foreground">
+                          {scrapWeight.toFixed(2)}g
                         </span>
                       </p>
                       <div
