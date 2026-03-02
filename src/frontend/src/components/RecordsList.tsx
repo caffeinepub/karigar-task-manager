@@ -41,11 +41,13 @@ import {
   Receipt,
   Search,
   Trash2,
+  TrendingDown,
   Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { type ExpenseRecord, useExpenses } from "../hooks/useExpenses";
 import {
   JobType,
   type LocalJobRecord,
@@ -138,6 +140,7 @@ export default function RecordsList({
   const records = rawRecords as LocalJobRecord[];
   const deleteMutation = useDeleteJobRecord();
   const { entries: stockEntries } = useStock();
+  const { expenses } = useExpenses();
   const [deleteTarget, setDeleteTarget] = useState<bigint | null>(null);
   const [search, setSearch] = useState("");
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
@@ -524,6 +527,9 @@ export default function RecordsList({
               </div>
             </div>
           </motion.div>
+
+          {/* Expense Totals card */}
+          <ExpenseTotalsCard expenses={expenses} onExpenses={onExpenses} />
         </motion.div>
 
         {/* Search + Export */}
@@ -838,6 +844,121 @@ export default function RecordsList({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function ExpenseTotalsCard({
+  expenses,
+  onExpenses,
+}: {
+  expenses: ExpenseRecord[];
+  onExpenses: () => void;
+}) {
+  const now = new Date();
+
+  // Today boundaries
+  const todayStr = now.toISOString().split("T")[0];
+
+  // This week: Monday to Sunday
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const diffToMonday = (dayOfWeek + 6) % 7;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - diffToMonday);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+
+  // This month
+  const thisMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // Previous month
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}`;
+
+  function sumAmount(list: ExpenseRecord[]): number {
+    return list.reduce((s, e) => s + (Number.parseFloat(e.amount) || 0), 0);
+  }
+
+  const todayTotal = sumAmount(expenses.filter((e) => e.date === todayStr));
+  const weekTotal = sumAmount(
+    expenses.filter((e) => e.date >= weekStartStr && e.date <= todayStr),
+  );
+  const thisMonthTotal = sumAmount(
+    expenses.filter((e) => e.date.startsWith(thisMonthStr)),
+  );
+  const prevMonthTotal = sumAmount(
+    expenses.filter((e) => e.date.startsWith(prevMonthStr)),
+  );
+
+  const prevMonthLabel = prevMonthDate.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+  const thisMonthLabel = now.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const tiles = [
+    {
+      label: "Today",
+      value: todayTotal,
+      sub: todayStr.split("-").reverse().join("/"),
+    },
+    { label: "This Week", value: weekTotal, sub: "Mon – today" },
+    { label: thisMonthLabel, value: thisMonthTotal, sub: "This month" },
+    { label: prevMonthLabel, value: prevMonthTotal, sub: "Previous month" },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.28, duration: 0.4 }}
+      className="rounded-xl border border-border bg-card shadow-warm overflow-hidden"
+    >
+      {/* Header */}
+      <button
+        type="button"
+        onClick={onExpenses}
+        className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-accent/30 transition-colors duration-150"
+        data-ocid="dashboard.expenses_card_button"
+      >
+        <div className="flex items-center gap-2">
+          <TrendingDown
+            className="w-4 h-4"
+            style={{ color: "oklch(0.55 0.16 25)" }}
+          />
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Expense Summary
+          </span>
+        </div>
+        <span className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          View All →
+        </span>
+      </button>
+
+      {/* Tiles grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+        {tiles.map((tile) => (
+          <div key={tile.label} className="p-4">
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1 truncate">
+              {tile.label}
+            </p>
+            <p
+              className="font-display text-xl font-bold leading-none mb-0.5"
+              style={{ color: "oklch(0.55 0.16 25)" }}
+            >
+              ₹
+              {tile.value.toLocaleString("en-IN", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+            <p className="text-xs text-muted-foreground">{tile.sub}</p>
+          </div>
+        ))}
+      </div>
+    </motion.div>
   );
 }
 
