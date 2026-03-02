@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,12 +7,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Hammer, Receipt, Scale, Wrench } from "lucide-react";
+import { Hammer, Pencil, Receipt, Scale, Wrench } from "lucide-react";
 import { JobType, type LocalJobRecord, Material } from "../hooks/useQueries";
 
 interface Props {
   record: LocalJobRecord;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
 function fmt(n: number | undefined, unit: string): string {
@@ -58,7 +60,7 @@ function Field({ label, value }: FieldProps) {
   );
 }
 
-export default function JobDetailModal({ record, onClose }: Props) {
+export default function JobDetailModal({ record, onClose, onEdit }: Props) {
   const isNew = record.jobType === JobType.new_;
 
   return (
@@ -173,9 +175,7 @@ export default function JobDetailModal({ record, onClose }: Props) {
             </>
           )}
 
-          {(record.makingChargeCustomer !== undefined ||
-            record.makingChargeKarigar !== undefined ||
-            record.otherCharge !== undefined) && (
+          {true && (
             <>
               <Separator />
               <section>
@@ -215,6 +215,28 @@ export default function JobDetailModal({ record, onClose }: Props) {
                         : undefined
                     }
                   />
+                  {(record as LocalJobRecord).deliveryDate && (
+                    <Field
+                      label="Delivery Date"
+                      value={fmtDate((record as LocalJobRecord).deliveryDate)}
+                    />
+                  )}
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Status
+                    </p>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold w-fit ${
+                        (record as LocalJobRecord).status === "delivered"
+                          ? "bg-green-100 text-green-700 border border-green-300"
+                          : "bg-amber-100 text-amber-700 border border-amber-300"
+                      }`}
+                    >
+                      {(record as LocalJobRecord).status === "delivered"
+                        ? "Delivered"
+                        : "Pending"}
+                    </span>
+                  </div>
                 </div>
               </section>
             </>
@@ -234,6 +256,27 @@ export default function JobDetailModal({ record, onClose }: Props) {
             </>
           )}
         </div>
+
+        {onEdit && (
+          <>
+            <Separator className="mt-5" />
+            <div className="pt-4 flex justify-end">
+              <Button
+                onClick={onEdit}
+                className="gap-2 font-medium shadow-gold-sm"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.75 0.148 65), oklch(0.65 0.14 52))",
+                  color: "oklch(0.12 0.025 45)",
+                  border: "1px solid oklch(0.68 0.14 58)",
+                }}
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Record
+              </Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

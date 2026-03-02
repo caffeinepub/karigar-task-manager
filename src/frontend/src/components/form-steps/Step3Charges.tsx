@@ -1,8 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Hammer, MessageSquare } from "lucide-react";
+import { CalendarDays, Hammer, MessageSquare } from "lucide-react";
 import type { FormData } from "../JobForm";
-import { FormCard, FormField, SectionHeading } from "./FormHelpers";
+import { FormCard, FormField, RadioGroup, SectionHeading } from "./FormHelpers";
 
 interface Props {
   data: FormData;
@@ -121,6 +121,34 @@ export default function Step3Charges({ data, errors, onChange }: Props) {
             </div>
           </div>
         )}
+
+        {/* Delivery Date & Status */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label="Delivery Date" error={errors.deliveryDate}>
+            <div className="relative">
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="date"
+                value={data.deliveryDate}
+                onChange={(e) => onChange({ deliveryDate: e.target.value })}
+                className="pl-9"
+              />
+            </div>
+          </FormField>
+
+          <FormField label="Status" error={errors.status}>
+            <RadioGroup
+              options={[
+                { value: "pending", label: "Pending" },
+                { value: "delivered", label: "Delivered" },
+              ]}
+              value={data.status}
+              onChange={(v) =>
+                onChange({ status: v as "pending" | "delivered" })
+              }
+            />
+          </FormField>
+        </div>
 
         {/* Remarks */}
         <FormField label="Remarks" error={errors.remarks}>

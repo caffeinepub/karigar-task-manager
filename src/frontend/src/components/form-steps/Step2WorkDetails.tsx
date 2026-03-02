@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { AlertCircle, CalendarDays, Scale } from "lucide-react";
+import { Material } from "../../hooks/useQueries";
 import type { FormData } from "../JobForm";
 import { FormCard, FormField, SectionHeading } from "./FormHelpers";
 
@@ -17,6 +18,7 @@ export default function Step2WorkDetails({
   onChange,
 }: Props) {
   const isLossNegative = lossWeight < 0;
+  const isOther = data.material === Material.other;
 
   return (
     <FormCard>
@@ -43,55 +45,57 @@ export default function Step2WorkDetails({
           </div>
         </FormField>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField
-            label="Received Item Weight"
-            error={errors.receivedItemWeight}
-          >
-            <div className="relative">
-              <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={data.receivedItemWeight}
-                onChange={(e) =>
-                  onChange({ receivedItemWeight: e.target.value })
-                }
-                placeholder="0.00"
-                className={`pl-9 pr-10 ${errors.receivedItemWeight ? "border-destructive ring-destructive/20" : ""}`}
-                aria-invalid={!!errors.receivedItemWeight}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                g
-              </span>
-            </div>
-          </FormField>
+        {!isOther && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              label="Received Item Weight"
+              error={errors.receivedItemWeight}
+            >
+              <div className="relative">
+                <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={data.receivedItemWeight}
+                  onChange={(e) =>
+                    onChange({ receivedItemWeight: e.target.value })
+                  }
+                  placeholder="0.00"
+                  className={`pl-9 pr-10 ${errors.receivedItemWeight ? "border-destructive ring-destructive/20" : ""}`}
+                  aria-invalid={!!errors.receivedItemWeight}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                  g
+                </span>
+              </div>
+            </FormField>
 
-          <FormField
-            label="Return Scrap Weight"
-            error={errors.returnScrapWeight}
-          >
-            <div className="relative">
-              <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={data.returnScrapWeight}
-                onChange={(e) =>
-                  onChange({ returnScrapWeight: e.target.value })
-                }
-                placeholder="0.00"
-                className={`pl-9 pr-10 ${errors.returnScrapWeight ? "border-destructive ring-destructive/20" : ""}`}
-                aria-invalid={!!errors.returnScrapWeight}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                g
-              </span>
-            </div>
-          </FormField>
-        </div>
+            <FormField
+              label="Return Scrap Weight"
+              error={errors.returnScrapWeight}
+            >
+              <div className="relative">
+                <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={data.returnScrapWeight}
+                  onChange={(e) =>
+                    onChange({ returnScrapWeight: e.target.value })
+                  }
+                  placeholder="0.00"
+                  className={`pl-9 pr-10 ${errors.returnScrapWeight ? "border-destructive ring-destructive/20" : ""}`}
+                  aria-invalid={!!errors.returnScrapWeight}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                  g
+                </span>
+              </div>
+            </FormField>
+          </div>
+        )}
 
         {/* Loss Weight (calculated) */}
         <div
@@ -146,21 +150,23 @@ export default function Step2WorkDetails({
         </div>
 
         {/* Given weight reminder */}
-        <div
-          className="rounded-lg px-4 py-3 text-sm flex items-center gap-2"
-          style={{
-            background: "oklch(var(--muted) / 0.5)",
-            color: "oklch(var(--muted-foreground))",
-          }}
-        >
-          <Scale className="w-4 h-4 shrink-0" />
-          <span>
-            Given material weight from Step 1:{" "}
-            <strong className="text-foreground">
-              {data.givenMaterialWeight || "—"} g
-            </strong>
-          </span>
-        </div>
+        {!isOther && (
+          <div
+            className="rounded-lg px-4 py-3 text-sm flex items-center gap-2"
+            style={{
+              background: "oklch(var(--muted) / 0.5)",
+              color: "oklch(var(--muted-foreground))",
+            }}
+          >
+            <Scale className="w-4 h-4 shrink-0" />
+            <span>
+              Given material weight from Step 1:{" "}
+              <strong className="text-foreground">
+                {data.givenMaterialWeight || "—"} g
+              </strong>
+            </span>
+          </div>
+        )}
       </div>
     </FormCard>
   );

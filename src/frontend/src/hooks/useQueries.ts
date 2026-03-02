@@ -9,6 +9,8 @@ const LS_KEY = "karigar_records";
 
 export interface LocalJobRecord extends JobRecord {
   assignTo?: string;
+  deliveryDate?: string;
+  status?: "pending" | "delivered";
 }
 
 function serializeBigInt(_key: string, value: unknown): unknown {
@@ -42,31 +44,49 @@ function loadLocalRecords(): LocalJobRecord[] {
   }
 }
 
+function sameId(a: bigint | unknown, b: bigint | unknown): boolean {
+  try {
+    return BigInt(String(a)) === BigInt(String(b));
+  } catch {
+    return a === b;
+  }
+}
+
 export function useGetAllJobRecords() {
   const { actor, isFetching } = useActor();
 
   return useQuery<JobRecord[]>({
     queryKey: ["jobRecords"],
     queryFn: async () => {
-      // Always load local records first — they are the source of truth
+      // Local storage is always the source of truth
       const localRecords = loadLocalRecords();
+      if (!actor) return localRecords;
+
       try {
-        if (!actor) return localRecords;
         const backendRecords = await actor.getAllJobRecords();
-        // Merge: for each backend record, keep local version if it has extra fields (assignTo)
-        const merged: LocalJobRecord[] = backendRecords.map((br) => {
-          const local = localRecords.find((lr) => lr.id === br.id);
-          return local
-            ? { ...br, assignTo: local.assignTo }
-            : (br as LocalJobRecord);
+        // Normalise backend IDs to BigInt
+        const normalised: LocalJobRecord[] = backendRecords.map((br) => ({
+          ...(br as LocalJobRecord),
+          id: BigInt(String(br.id)),
+          createdAt: BigInt(String((br as LocalJobRecord).createdAt ?? 0)),
+        }));
+
+        // For each backend record, prefer the local version (it may have assignTo etc.)
+        const merged: LocalJobRecord[] = normalised.map((br) => {
+          const local = localRecords.find((lr) => sameId(lr.id, br.id));
+          return local ? { ...br, ...local, id: br.id } : br;
         });
-        // Also include any local-only records not yet synced to backend
-        const backendIds = new Set(backendRecords.map((r) => r.id));
-        const localOnly = localRecords.filter((lr) => !backendIds.has(lr.id));
+
+        // Include local-only records (saved when backend was unreachable)
+        const localOnly = localRecords.filter(
+          (lr) => !normalised.some((br) => sameId(br.id, lr.id)),
+        );
+
         const finalRecords = [...localOnly, ...merged];
         saveLocalRecords(finalRecords);
         return finalRecords;
       } catch {
+        // Backend unreachable — return what we have locally
         return localRecords;
       }
     },
@@ -92,6 +112,8 @@ export interface CreateJobPayload {
   makingChargeKarigar?: number;
   workDescription?: string;
   remarks?: string;
+  deliveryDate?: string;
+  status?: "pending" | "delivered";
 }
 
 function buildLocalRecord(
@@ -117,6 +139,8 @@ function buildLocalRecord(
     makingChargeKarigar: payload.makingChargeKarigar,
     workDescription: payload.workDescription,
     remarks: payload.remarks,
+    deliveryDate: payload.deliveryDate,
+    status: payload.status ?? "pending",
   };
 }
 
@@ -178,8 +202,91 @@ export function useCreateJobRecord() {
       // without waiting for a re-fetch that might overwrite it
       queryClient.setQueryData<LocalJobRecord[]>(["jobRecords"], (old) => {
         const existing = old ?? [];
-        if (existing.find((r) => r.id === record.id)) return existing;
+        if (existing.find((r) => sameId(r.id, record.id))) return existing;
         return [record, ...existing];
+      });
+      // Invalidate so the next background fetch picks up any backend changes
+      // but don't refetch immediately (avoids wiping optimistic update)
+      queryClient.invalidateQueries({
+        queryKey: ["jobRecords"],
+        refetchType: "none",
+      });
+    },
+  });
+}
+
+export interface UpdateJobPayload extends Partial<CreateJobPayload> {
+  id: bigint;
+}
+
+function updateJobLocally(
+  id: bigint,
+  patch: Partial<CreateJobPayload>,
+): LocalJobRecord {
+  const records = loadLocalRecords();
+  const idx = records.findIndex((r) => sameId(r.id, id));
+  if (idx === -1) throw new Error("Record not found");
+
+  const existing = records[idx];
+  const merged: LocalJobRecord = {
+    ...existing,
+    ...patch,
+    id: existing.id,
+    createdAt: existing.createdAt,
+  };
+
+  // Recalculate lossWeight if weight fields changed
+  const given =
+    merged.givenMaterialWeight !== undefined
+      ? Number(merged.givenMaterialWeight)
+      : 0;
+  const received =
+    merged.receivedItemWeight !== undefined
+      ? Number(merged.receivedItemWeight)
+      : 0;
+  const scrap =
+    merged.returnScrapWeight !== undefined
+      ? Number(merged.returnScrapWeight)
+      : 0;
+  merged.lossWeight = Math.max(0, given - received - scrap);
+
+  records[idx] = merged;
+  saveLocalRecords(records);
+  return merged;
+}
+
+export function useUpdateJobRecord() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...patch
+    }: UpdateJobPayload): Promise<LocalJobRecord> => {
+      const updated = updateJobLocally(id, patch);
+      // Best-effort backend sync
+      if (actor) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const backendActor = actor as any;
+          if (typeof backendActor.updateJobRecord === "function") {
+            await backendActor.updateJobRecord(id, patch);
+          }
+        } catch {
+          // Backend update failed — local already updated
+        }
+      }
+      return updated;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<LocalJobRecord[]>(["jobRecords"], (old) => {
+        if (!old) return [updated];
+        return old.map((r) => (sameId(r.id, updated.id) ? updated : r));
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["jobRecords"],
+        refetchType: "none",
       });
     },
   });
@@ -193,7 +300,7 @@ export function useDeleteJobRecord() {
     mutationFn: async (jobId: bigint) => {
       // Always remove from localStorage first so it doesn't reappear on refresh
       const records = loadLocalRecords();
-      saveLocalRecords(records.filter((r) => r.id !== jobId));
+      saveLocalRecords(records.filter((r) => !sameId(r.id, jobId)));
       // Attempt backend delete if actor is available (best-effort)
       if (actor) {
         try {
@@ -208,7 +315,7 @@ export function useDeleteJobRecord() {
       const prev = queryClient.getQueryData<JobRecord[]>(["jobRecords"]);
       queryClient.setQueryData<JobRecord[]>(
         ["jobRecords"],
-        (old) => old?.filter((r) => r.id !== jobId) ?? [],
+        (old) => old?.filter((r) => !sameId(r.id, jobId)) ?? [],
       );
       return { prev };
     },

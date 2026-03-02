@@ -1,14 +1,57 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useState } from "react";
-import JobForm from "./components/JobForm";
+import JobForm, { type FormData } from "./components/JobForm";
 import RecordsList from "./components/RecordsList";
-import type { LocalJobRecord } from "./hooks/useQueries";
+import StockForm from "./components/StockForm";
+import { JobType, type LocalJobRecord, Material } from "./hooks/useQueries";
 
-export type AppView = "list" | "new-job";
+export type AppView = "list" | "new-job" | "edit-job" | "stock";
+
+function recordToFormData(record: LocalJobRecord): FormData {
+  return {
+    date: record.date ?? new Date().toISOString().split("T")[0],
+    assignTo: record.assignTo ?? "",
+    jobType: record.jobType ?? JobType.new_,
+    billNo: record.billNo ?? "",
+    material: record.material ?? Material.gold,
+    itemName: record.itemName ?? "",
+    givenMaterialWeight:
+      record.givenMaterialWeight !== undefined
+        ? String(record.givenMaterialWeight)
+        : "",
+    workDescription: record.workDescription ?? "",
+    workReceivedDate:
+      record.workReceivedDate ?? new Date().toISOString().split("T")[0],
+    receivedItemWeight:
+      record.receivedItemWeight !== undefined
+        ? String(record.receivedItemWeight)
+        : "",
+    returnScrapWeight:
+      record.returnScrapWeight !== undefined
+        ? String(record.returnScrapWeight)
+        : "",
+    otherCharge:
+      record.otherCharge !== undefined ? String(record.otherCharge) : "",
+    makingChargeCustomer:
+      record.makingChargeCustomer !== undefined
+        ? String(record.makingChargeCustomer)
+        : "",
+    makingChargeKarigar:
+      record.makingChargeKarigar !== undefined
+        ? String(record.makingChargeKarigar)
+        : "",
+    deliveryDate: record.deliveryDate ?? "",
+    status: record.status ?? "pending",
+    remarks: record.remarks ?? "",
+  };
+}
 
 export default function App() {
   const [view, setView] = useState<AppView>("list");
   const [viewingRecord, setViewingRecord] = useState<LocalJobRecord | null>(
+    null,
+  );
+  const [editingRecord, setEditingRecord] = useState<LocalJobRecord | null>(
     null,
   );
 
@@ -19,10 +62,16 @@ export default function App() {
   function goToList() {
     setView("list");
     setViewingRecord(null);
+    setEditingRecord(null);
   }
 
   function handleViewRecord(record: LocalJobRecord) {
     setViewingRecord(record);
+  }
+
+  function goToEditJob(record: LocalJobRecord) {
+    setEditingRecord(record);
+    setView("edit-job");
   }
 
   return (
@@ -42,11 +91,22 @@ export default function App() {
           onViewRecord={handleViewRecord}
           viewingRecord={viewingRecord}
           onCloseRecord={() => setViewingRecord(null)}
+          onEditRecord={goToEditJob}
+          onStock={() => setView("stock")}
         />
       )}
       {view === "new-job" && (
         <JobForm onSuccess={goToList} onCancel={goToList} />
       )}
+      {view === "edit-job" && editingRecord && (
+        <JobForm
+          initialData={recordToFormData(editingRecord)}
+          recordId={editingRecord.id}
+          onSuccess={goToList}
+          onCancel={goToList}
+        />
+      )}
+      {view === "stock" && <StockForm onBack={goToList} />}
 
       <Toaster
         toastOptions={{

@@ -8,6 +8,7 @@ import {
   JobType,
   Material,
   useCreateJobRecord,
+  useUpdateJobRecord,
 } from "../hooks/useQueries";
 import Step1JobDetails from "./form-steps/Step1JobDetails";
 import Step2WorkDetails from "./form-steps/Step2WorkDetails";
@@ -17,6 +18,8 @@ import SuccessSummary from "./form-steps/SuccessSummary";
 interface Props {
   onSuccess: () => void;
   onCancel: () => void;
+  initialData?: FormData;
+  recordId?: bigint;
 }
 
 export interface FormData {
@@ -39,6 +42,8 @@ export interface FormData {
   otherCharge: string;
   makingChargeCustomer: string;
   makingChargeKarigar: string;
+  deliveryDate: string;
+  status: "pending" | "delivered";
   remarks: string;
 }
 
@@ -57,19 +62,30 @@ const initialFormData: FormData = {
   otherCharge: "",
   makingChargeCustomer: "",
   makingChargeKarigar: "",
+  deliveryDate: "",
+  status: "pending",
   remarks: "",
 };
 
 type StepName = "Job Details" | "Work Details" | "Charges";
 const ALL_STEPS: StepName[] = ["Job Details", "Work Details", "Charges"];
 
-export default function JobForm({ onSuccess, onCancel }: Props) {
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+export default function JobForm({
+  onSuccess,
+  onCancel,
+  initialData,
+  recordId,
+}: Props) {
+  const isEditMode = recordId !== undefined;
+  const [formData, setFormData] = useState<FormData>(
+    initialData ?? initialFormData,
+  );
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [submittedId, setSubmittedId] = useState<bigint | null>(null);
 
   const createMutation = useCreateJobRecord();
+  const updateMutation = useUpdateJobRecord();
   const steps = ALL_STEPS;
   const totalSteps = steps.length;
   const isLastStep = currentStep === totalSteps - 1;
@@ -103,6 +119,8 @@ export default function JobForm({ onSuccess, onCancel }: Props) {
       jobType: formData.jobType,
       assignTo: formData.assignTo || undefined,
       remarks: formData.remarks || undefined,
+      deliveryDate: formData.deliveryDate || undefined,
+      status: formData.status,
       makingChargeCustomer: formData.makingChargeCustomer
         ? Number(formData.makingChargeCustomer)
         : undefined,
@@ -119,6 +137,16 @@ export default function JobForm({ onSuccess, onCancel }: Props) {
         ? Number(formData.otherCharge)
         : undefined,
     };
+
+    if (isEditMode && recordId !== undefined) {
+      try {
+        await updateMutation.mutateAsync({ id: recordId, ...payload });
+        onSuccess();
+      } catch (_err) {
+        toast.error("Failed to update job record. Please try again.");
+      }
+      return;
+    }
 
     try {
       const { id } = await createMutation.mutateAsync(payload);
@@ -185,10 +213,12 @@ export default function JobForm({ onSuccess, onCancel }: Props) {
                 className="font-display text-lg font-bold leading-tight"
                 style={{ color: "oklch(0.22 0.04 50)" }}
               >
-                New Job Record
+                {isEditMode ? "Edit Job Record" : "New Job Record"}
               </h1>
               <p className="text-xs text-muted-foreground">
-                Fill in the job details below
+                {isEditMode
+                  ? "Update the job details below"
+                  : "Fill in the job details below"}
               </p>
             </div>
           </div>
@@ -247,7 +277,7 @@ export default function JobForm({ onSuccess, onCancel }: Props) {
           {isLastStep ? (
             <Button
               onClick={handleSubmit}
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               className="gap-2 min-w-28 font-medium shadow-gold-sm"
               style={{
                 background:
@@ -256,15 +286,15 @@ export default function JobForm({ onSuccess, onCancel }: Props) {
                 border: "1px solid oklch(0.68 0.14 58)",
               }}
             >
-              {createMutation.isPending ? (
+              {createMutation.isPending || updateMutation.isPending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Saving...
+                  {isEditMode ? "Updating..." : "Saving..."}
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Submit Job
+                  {isEditMode ? "Update Job" : "Submit Job"}
                 </>
               )}
             </Button>

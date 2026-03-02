@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CalendarDays, Tag, User, Weight } from "lucide-react";
+import { useEmployees } from "../../hooks/useEmployees";
 import { Material } from "../../hooks/useQueries";
 import type { FormData } from "../JobForm";
 import { FormCard, FormField, SectionHeading } from "./FormHelpers";
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export default function Step1JobDetails({ data, errors, onChange }: Props) {
+  const { employees } = useEmployees();
+
   return (
     <FormCard>
       <SectionHeading
@@ -43,15 +46,39 @@ export default function Step1JobDetails({ data, errors, onChange }: Props) {
 
         {/* Assign To */}
         <FormField label="Assign To" error={errors.assignTo}>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-muted-foreground shrink-0" />
+            <Select
               value={data.assignTo}
-              onChange={(e) => onChange({ assignTo: e.target.value })}
-              placeholder="Karigar name or ID"
-              className={`pl-9 ${errors.assignTo ? "border-destructive ring-destructive/20" : ""}`}
-              aria-invalid={!!errors.assignTo}
-            />
+              onValueChange={(v) =>
+                onChange({ assignTo: v === "__unassigned__" ? "" : v })
+              }
+            >
+              <SelectTrigger
+                className={`w-full ${errors.assignTo ? "border-destructive ring-destructive/20" : ""}`}
+              >
+                <SelectValue placeholder="Select employee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__unassigned__">
+                  <span className="text-muted-foreground">Unassigned</span>
+                </SelectItem>
+                {employees.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                    No employees added yet
+                  </div>
+                ) : (
+                  employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.name}>
+                      <div className="flex items-center gap-2">
+                        <User className="w-3 h-3 text-muted-foreground" />
+                        {emp.name}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
         </FormField>
 
@@ -124,6 +151,8 @@ function NewJobFields({
   errors: Partial<Record<keyof FormData, string>>;
   onChange: (patch: Partial<FormData>) => void;
 }) {
+  const isOther = data.material === Material.other;
+
   return (
     <>
       <FormField label="Item Name / Description" error={errors.itemName}>
@@ -139,27 +168,31 @@ function NewJobFields({
         </div>
       </FormField>
 
-      <FormField
-        label="Given Raw Material Weight"
-        error={errors.givenMaterialWeight}
-      >
-        <div className="relative">
-          <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={data.givenMaterialWeight}
-            onChange={(e) => onChange({ givenMaterialWeight: e.target.value })}
-            placeholder="0.00"
-            className={`pl-9 pr-10 ${errors.givenMaterialWeight ? "border-destructive ring-destructive/20" : ""}`}
-            aria-invalid={!!errors.givenMaterialWeight}
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-            g
-          </span>
-        </div>
-      </FormField>
+      {!isOther && (
+        <FormField
+          label="Given Raw Material Weight"
+          error={errors.givenMaterialWeight}
+        >
+          <div className="relative">
+            <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={data.givenMaterialWeight}
+              onChange={(e) =>
+                onChange({ givenMaterialWeight: e.target.value })
+              }
+              placeholder="0.00"
+              className={`pl-9 pr-10 ${errors.givenMaterialWeight ? "border-destructive ring-destructive/20" : ""}`}
+              aria-invalid={!!errors.givenMaterialWeight}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+              g
+            </span>
+          </div>
+        </FormField>
+      )}
     </>
   );
 }

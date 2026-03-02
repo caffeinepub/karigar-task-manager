@@ -10,36 +10,39 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
+  ArrowDownToLine,
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
+  Circle,
   Eye,
   Gem,
+  Package,
+  Pencil,
   Plus,
   Search,
   Trash2,
+  Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  type JobRecord,
   JobType,
   type LocalJobRecord,
   Material,
   useDeleteJobRecord,
   useGetAllJobRecords,
 } from "../hooks/useQueries";
+import { type StockOutEntry, useStock } from "../hooks/useStock";
+import EmployeeForm from "./EmployeeForm";
 import JobDetailModal from "./JobDetailModal";
 
 interface Props {
@@ -47,7 +50,20 @@ interface Props {
   onViewRecord: (r: LocalJobRecord) => void;
   viewingRecord: LocalJobRecord | null;
   onCloseRecord: () => void;
+  onEditRecord: (r: LocalJobRecord) => void;
+  onStock: () => void;
 }
+
+type SortColumn =
+  | "date"
+  | "assignTo"
+  | "billNo"
+  | "material"
+  | "workReceivedDate"
+  | "deliveryDate"
+  | "status";
+
+type SortDir = "asc" | "desc";
 
 function materialLabel(m: Material): string {
   switch (m) {
@@ -69,17 +85,42 @@ function formatDate(dateStr: string): string {
   }
 }
 
+function getSortValue(record: LocalJobRecord, col: SortColumn): string {
+  switch (col) {
+    case "date":
+      return record.date ?? "";
+    case "assignTo":
+      return (record.assignTo ?? "").toLowerCase();
+    case "billNo":
+      return (record.billNo ?? "").toLowerCase();
+    case "material":
+      return materialLabel(record.material).toLowerCase();
+    case "workReceivedDate":
+      return (record.workReceivedDate ?? "").toLowerCase();
+    case "deliveryDate":
+      return (record.deliveryDate ?? "").toLowerCase();
+    case "status":
+      return (record.status ?? "").toLowerCase();
+  }
+}
+
 export default function RecordsList({
   onNewJob,
   onViewRecord,
   viewingRecord,
   onCloseRecord,
+  onEditRecord,
+  onStock,
 }: Props) {
   const { data: rawRecords = [], isLoading } = useGetAllJobRecords();
   const records = rawRecords as LocalJobRecord[];
   const deleteMutation = useDeleteJobRecord();
+  const { entries: stockEntries } = useStock();
   const [deleteTarget, setDeleteTarget] = useState<bigint | null>(null);
   const [search, setSearch] = useState("");
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const filtered = records.filter((r) => {
     const q = search.toLowerCase();
@@ -93,12 +134,22 @@ export default function RecordsList({
     );
   });
 
-  // Sort newest first by createdAt
   const sorted = [...filtered].sort((a, b) => {
-    if (a.createdAt > b.createdAt) return -1;
-    if (a.createdAt < b.createdAt) return 1;
+    const aVal = getSortValue(a, sortColumn);
+    const bVal = getSortValue(b, sortColumn);
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
     return 0;
   });
+
+  function handleSortClick(col: SortColumn) {
+    if (col === sortColumn) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(col);
+      setSortDir("asc");
+    }
+  }
 
   async function handleDelete() {
     if (deleteTarget === null) return;
@@ -112,11 +163,25 @@ export default function RecordsList({
     }
   }
 
+  const columns: { key: SortColumn; label: string; title?: string }[] = [
+    { key: "date", label: "Date" },
+    { key: "assignTo", label: "Assign To" },
+    { key: "billNo", label: "Bill No" },
+    { key: "material", label: "Material" },
+    {
+      key: "workReceivedDate",
+      label: "Rcvd Date",
+      title: "Complete Work Received Date",
+    },
+    { key: "deliveryDate", label: "Delivery Date" },
+    { key: "status", label: "Status" },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="sticky top-0.5 z-40 bg-card/95 backdrop-blur-md border-b border-border shadow-warm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center"
@@ -139,71 +204,275 @@ export default function RecordsList({
               </p>
             </div>
           </div>
-          <Button
-            onClick={onNewJob}
-            className="gap-2 font-medium shadow-gold-sm"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.75 0.148 65), oklch(0.65 0.14 52))",
-              color: "oklch(0.12 0.025 45)",
-              border: "1px solid oklch(0.68 0.14 58)",
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Job</span>
-            <span className="sm:hidden">New</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowEmployeeForm(true)}
+              className="gap-2 font-medium border-border hover:bg-accent/50"
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Employee</span>
+              <span className="sm:hidden">Employee</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onStock}
+              className="gap-2 font-medium border-border hover:bg-accent/50"
+            >
+              <Package className="w-4 h-4" />
+              <span className="hidden sm:inline">Stock</span>
+              <span className="sm:hidden">Stock</span>
+            </Button>
+            <Button
+              onClick={onNewJob}
+              className="gap-2 font-medium shadow-gold-sm"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.75 0.148 65), oklch(0.65 0.14 52))",
+                color: "oklch(0.12 0.025 45)",
+                border: "1px solid oklch(0.68 0.14 58)",
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">New Job</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Stats bar */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="grid grid-cols-3 gap-3 mb-8"
+          className="space-y-3 mb-8"
         >
-          {[
-            {
-              label: "Total Jobs",
-              value: isLoading ? "–" : records.length,
-              sub: "all records",
-            },
-            {
-              label: "New Jobs",
-              value: isLoading
-                ? "–"
-                : records.filter((r) => r.jobType === JobType.new_).length,
-              sub: "fabrication",
-            },
-            {
-              label: "Repairs",
-              value: isLoading
-                ? "–"
-                : records.filter((r) => r.jobType === JobType.repair).length,
-              sub: "repair work",
-            },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08, duration: 0.4 }}
-              className="rounded-xl border border-border bg-card p-4 shadow-warm hover:shadow-gold-sm transition-shadow duration-200"
-            >
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">
-                {stat.label}
-              </p>
-              <p
-                className="font-display text-2xl font-bold leading-none mb-0.5"
-                style={{ color: "oklch(0.72 0.148 60)" }}
+          {/* Job stats */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              {
+                label: "Total Jobs",
+                value: isLoading ? "–" : records.length,
+                sub: "all records",
+              },
+              {
+                label: "New Jobs",
+                value: isLoading
+                  ? "–"
+                  : records.filter((r) => r.jobType === JobType.new_).length,
+                sub: "fabrication",
+              },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08, duration: 0.4 }}
+                className="rounded-xl border border-border bg-card p-4 shadow-warm hover:shadow-gold-sm transition-shadow duration-200"
               >
-                {stat.value}
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">
+                  {stat.label}
+                </p>
+                <p
+                  className="font-display text-2xl font-bold leading-none mb-0.5"
+                  style={{ color: "oklch(0.72 0.148 60)" }}
+                >
+                  {stat.value}
+                </p>
+                <p className="text-xs text-muted-foreground">{stat.sub}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Stock summary */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+            className="rounded-xl border border-border bg-card shadow-warm overflow-hidden"
+          >
+            {/* Section header */}
+            <button
+              type="button"
+              onClick={onStock}
+              className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-accent/30 transition-colors duration-150"
+            >
+              <div className="flex items-center gap-2">
+                <Package
+                  className="w-4 h-4"
+                  style={{ color: "oklch(0.72 0.148 60)" }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Stock Overview
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                View All →
+              </span>
+            </button>
+
+            <div className="grid grid-cols-3 divide-x divide-border">
+              {[
+                {
+                  label: "Stock In",
+                  value: stockEntries.filter(
+                    (e) => e.type === "buyback" || e.type === "raw_stock",
+                  ).length,
+                  sub: "buyback + raw",
+                  icon: <ArrowDownToLine className="w-4 h-4" />,
+                  color: "oklch(0.55 0.14 155)",
+                },
+                {
+                  label: "Buyback",
+                  value: stockEntries.filter((e) => e.type === "buyback")
+                    .length,
+                  sub: "entries",
+                  icon: <ArrowLeftRight className="w-4 h-4" />,
+                  color: "oklch(0.55 0.14 240)",
+                },
+                {
+                  label: "Stock Out",
+                  value: stockEntries.filter((e) => e.type === "stock_out")
+                    .length,
+                  sub: "dispatched",
+                  icon: <ArrowUpFromLine className="w-4 h-4" />,
+                  color: "oklch(0.55 0.16 25)",
+                },
+              ].map((stat) => (
+                <div key={stat.label} className="p-4">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span style={{ color: stat.color }}>{stat.icon}</span>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                      {stat.label}
+                    </p>
+                  </div>
+                  <p
+                    className="font-display text-2xl font-bold leading-none mb-0.5"
+                    style={{ color: stat.color }}
+                  >
+                    {stat.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{stat.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Gold vs Silver breakdown */}
+            <div className="border-t border-border px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                Material Breakdown
               </p>
-              <p className="text-xs text-muted-foreground">{stat.sub}</p>
-            </motion.div>
-          ))}
+              <div className="grid grid-cols-2 gap-3">
+                {(
+                  [
+                    {
+                      material: "gold" as const,
+                      label: "Gold",
+                      color: "oklch(0.72 0.148 60)",
+                      bg: "oklch(0.97 0.04 78 / 0.5)",
+                      border: "oklch(0.72 0.148 60 / 0.25)",
+                    },
+                    {
+                      material: "silver" as const,
+                      label: "Silver",
+                      color: "oklch(0.50 0.02 260)",
+                      bg: "oklch(0.96 0.01 260 / 0.5)",
+                      border: "oklch(0.60 0.04 260 / 0.3)",
+                    },
+                  ] as const
+                ).map(({ material, label, color, bg, border }) => {
+                  const inCount = stockEntries.filter(
+                    (e) =>
+                      (e.type === "buyback" || e.type === "raw_stock") &&
+                      e.material === material,
+                  ).length;
+                  const outCount = stockEntries.filter(
+                    (e) => e.type === "stock_out" && e.material === material,
+                  ).length;
+
+                  const inWeight = stockEntries
+                    .filter(
+                      (e) =>
+                        (e.type === "buyback" || e.type === "raw_stock") &&
+                        e.material === material,
+                    )
+                    .reduce((sum, e) => {
+                      const w =
+                        e.type === "buyback"
+                          ? Number.parseFloat(e.givenPureWeight) || 0
+                          : e.type === "raw_stock"
+                            ? Number.parseFloat(e.weight) || 0
+                            : 0;
+                      return sum + w;
+                    }, 0);
+
+                  const outWeight = stockEntries
+                    .filter(
+                      (e): e is StockOutEntry =>
+                        e.type === "stock_out" && e.material === material,
+                    )
+                    .reduce(
+                      (sum, e) => sum + (Number.parseFloat(e.weight) || 0),
+                      0,
+                    );
+
+                  const netWeight = inWeight - outWeight;
+                  const netPositive = netWeight >= 0;
+
+                  return (
+                    <div
+                      key={material}
+                      className="rounded-lg px-3 py-2.5"
+                      style={{ background: bg, border: `1px solid ${border}` }}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Circle
+                          className="w-3 h-3 shrink-0 fill-current"
+                          style={{ color }}
+                        />
+                        <p
+                          className="text-sm font-semibold leading-tight"
+                          style={{ color }}
+                        >
+                          {label}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        In:{" "}
+                        <span className="font-medium text-foreground">
+                          {inCount} ({inWeight.toFixed(2)}g)
+                        </span>
+                        {"  "}Out:{" "}
+                        <span className="font-medium text-foreground">
+                          {outCount} ({outWeight.toFixed(2)}g)
+                        </span>
+                      </p>
+                      <div
+                        className="mt-1.5 pt-1.5 border-t"
+                        style={{ borderColor: border }}
+                      >
+                        <p className="text-xs font-semibold">
+                          Net:{" "}
+                          <span
+                            style={{
+                              color: netPositive
+                                ? "oklch(0.50 0.14 155)"
+                                : "oklch(0.50 0.16 25)",
+                            }}
+                          >
+                            {netPositive ? "+" : ""}
+                            {netWeight.toFixed(2)}g
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
 
         {/* Search */}
@@ -216,7 +485,7 @@ export default function RecordsList({
           >
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by bill no, material, type..."
+              placeholder="Search by bill no, material, assign to..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 bg-card border-border focus-visible:ring-primary"
@@ -247,100 +516,166 @@ export default function RecordsList({
             <EmptyState onNewJob={onNewJob} hasSearch={search.length > 0} />
           ) : (
             <>
-              {/* Desktop table header */}
-              <div className="hidden sm:grid grid-cols-[1fr_1fr_100px_100px_auto] gap-4 px-6 py-3 border-b border-border bg-muted/30">
-                {["Date", "Bill No", "Type", "Material", ""].map((h) => (
-                  <span
-                    key={h}
-                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    {h}
-                  </span>
-                ))}
+              {/* Desktop table header — scrollable on medium screens */}
+              <div className="hidden sm:block overflow-x-auto">
+                <div className="min-w-[860px] grid grid-cols-[110px_120px_100px_90px_110px_110px_90px_auto] gap-3 px-4 py-3 border-b border-border bg-muted/30">
+                  {columns.map((col) => (
+                    <button
+                      key={col.key}
+                      type="button"
+                      title={col.title}
+                      onClick={() => handleSortClick(col.key)}
+                      className="flex items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+                    >
+                      <span className="truncate">{col.label}</span>
+                      {sortColumn === col.key ? (
+                        sortDir === "asc" ? (
+                          <ChevronUp
+                            className="w-3.5 h-3.5 shrink-0"
+                            style={{ color: "oklch(0.72 0.148 60)" }}
+                          />
+                        ) : (
+                          <ChevronDown
+                            className="w-3.5 h-3.5 shrink-0"
+                            style={{ color: "oklch(0.72 0.148 60)" }}
+                          />
+                        )
+                      ) : (
+                        <ChevronsUpDown className="w-3.5 h-3.5 shrink-0 opacity-40" />
+                      )}
+                    </button>
+                  ))}
+                  {/* Empty header for actions column */}
+                  <span />
+                </div>
               </div>
 
-              <AnimatePresence initial={false}>
-                {sorted.map((record, i) => (
-                  <motion.div
-                    key={record.id.toString()}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 8, height: 0 }}
-                    transition={{ delay: i * 0.03, duration: 0.25 }}
-                    className={`group flex items-center gap-3 sm:grid sm:grid-cols-[1fr_1fr_100px_100px_auto] sm:gap-4 px-4 sm:px-6 py-4 ${
-                      i < sorted.length - 1 ? "border-b border-border" : ""
-                    } hover:bg-accent/30 transition-colors duration-150 cursor-pointer`}
-                    onClick={() => onViewRecord(record)}
-                  >
-                    {/* Date */}
-                    <div>
-                      <span className="text-sm font-medium text-foreground">
-                        {formatDate(record.date)}
-                      </span>
-                    </div>
+              <div className="overflow-x-auto">
+                <AnimatePresence initial={false}>
+                  {sorted.map((record, i) => (
+                    <motion.div
+                      key={record.id.toString()}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8, height: 0 }}
+                      transition={{ delay: i * 0.03, duration: 0.25 }}
+                      className={`group flex items-center gap-3 sm:min-w-[860px] sm:grid sm:grid-cols-[110px_120px_100px_90px_110px_110px_90px_auto] sm:gap-3 px-4 py-4 ${
+                        i < sorted.length - 1 ? "border-b border-border" : ""
+                      } hover:bg-accent/30 transition-colors duration-150 cursor-pointer`}
+                      onClick={() => onViewRecord(record)}
+                    >
+                      {/* Date */}
+                      <div className="min-w-[80px]">
+                        <span className="text-sm font-medium text-foreground">
+                          {formatDate(record.date)}
+                        </span>
+                      </div>
 
-                    {/* Bill No */}
-                    <div>
-                      <span
-                        className="text-sm font-semibold font-mono"
-                        style={{ color: "oklch(0.62 0.14 50)" }}
-                      >
-                        #{record.billNo}
-                      </span>
-                    </div>
+                      {/* Assign To */}
+                      <div className="min-w-[90px] hidden sm:block">
+                        <span className="text-sm text-muted-foreground truncate block">
+                          {record.assignTo ?? "–"}
+                        </span>
+                      </div>
 
-                    {/* Type Badge */}
-                    <div>
-                      <Badge
-                        className={`text-xs font-semibold border ${
-                          record.jobType === JobType.new_
-                            ? "bg-primary/15 text-primary border-primary/30"
-                            : "bg-blue-500/10 text-blue-600 border-blue-400/30 dark:text-blue-400"
-                        }`}
-                        variant="outline"
-                      >
-                        {record.jobType === JobType.new_ ? "New" : "Repair"}
-                      </Badge>
-                    </div>
+                      {/* Bill No */}
+                      <div className="min-w-[70px]">
+                        <span
+                          className="text-sm font-semibold font-mono"
+                          style={{ color: "oklch(0.62 0.14 50)" }}
+                        >
+                          #{record.billNo}
+                        </span>
+                      </div>
 
-                    {/* Material */}
-                    <div className="hidden sm:block">
-                      <span className="text-sm text-muted-foreground">
-                        {materialLabel(record.material)}
-                      </span>
-                    </div>
+                      {/* Material */}
+                      <div className="min-w-[70px] hidden sm:block">
+                        <span className="text-sm text-muted-foreground">
+                          {materialLabel(record.material)}
+                        </span>
+                      </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 ml-auto">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 hover:text-primary hover:bg-primary/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewRecord(record);
-                        }}
-                        aria-label="View details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(record.id);
-                        }}
-                        aria-label="Delete record"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity sm:hidden" />
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                      {/* Work Received Date */}
+                      <div className="min-w-[80px] hidden sm:block">
+                        <span className="text-sm text-muted-foreground">
+                          {record.workReceivedDate
+                            ? formatDate(record.workReceivedDate)
+                            : "–"}
+                        </span>
+                      </div>
+
+                      {/* Delivery Date */}
+                      <div className="min-w-[80px] hidden sm:block">
+                        <span className="text-sm text-muted-foreground">
+                          {record.deliveryDate
+                            ? formatDate(record.deliveryDate)
+                            : "–"}
+                        </span>
+                      </div>
+
+                      {/* Status */}
+                      <div className="min-w-[70px] hidden sm:block">
+                        {record.status === "delivered" ? (
+                          <Badge
+                            className="text-xs font-semibold border bg-green-500/10 text-green-700 border-green-400/30 dark:text-green-400"
+                            variant="outline"
+                          >
+                            Delivered
+                          </Badge>
+                        ) : (
+                          <Badge
+                            className="text-xs font-semibold border bg-amber-500/10 text-amber-700 border-amber-400/30 dark:text-amber-400"
+                            variant="outline"
+                          >
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 ml-auto">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:text-primary hover:bg-primary/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewRecord(record);
+                          }}
+                          aria-label="View details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:text-primary hover:bg-primary/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditRecord(record);
+                          }}
+                          aria-label="Edit record"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(record.id);
+                          }}
+                          aria-label="Delete record"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity sm:hidden" />
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </>
           )}
         </motion.div>
@@ -371,9 +706,22 @@ export default function RecordsList({
       {/* Detail Modal */}
       <AnimatePresence>
         {viewingRecord && (
-          <JobDetailModal record={viewingRecord} onClose={onCloseRecord} />
+          <JobDetailModal
+            record={viewingRecord}
+            onClose={onCloseRecord}
+            onEdit={() => {
+              onCloseRecord();
+              onEditRecord(viewingRecord);
+            }}
+          />
         )}
       </AnimatePresence>
+
+      {/* Employee Form Dialog */}
+      <EmployeeForm
+        open={showEmployeeForm}
+        onOpenChange={setShowEmployeeForm}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog
