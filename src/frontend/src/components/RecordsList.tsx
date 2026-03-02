@@ -10,6 +10,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -22,11 +30,15 @@ import {
   ChevronUp,
   ChevronsUpDown,
   Circle,
+  Download,
   Eye,
+  FileSpreadsheet,
+  FileText,
   Gem,
   Package,
   Pencil,
   Plus,
+  Receipt,
   Search,
   Trash2,
   Users,
@@ -46,6 +58,10 @@ import {
   type StockOutEntry,
   useStock,
 } from "../hooks/useStock";
+import {
+  exportJobRecordsExcel,
+  exportJobRecordsPDF,
+} from "../utils/exportData";
 import EmployeeForm from "./EmployeeForm";
 import JobDetailModal from "./JobDetailModal";
 
@@ -56,6 +72,7 @@ interface Props {
   onCloseRecord: () => void;
   onEditRecord: (r: LocalJobRecord) => void;
   onStock: () => void;
+  onExpenses: () => void;
 }
 
 type SortColumn =
@@ -115,6 +132,7 @@ export default function RecordsList({
   onCloseRecord,
   onEditRecord,
   onStock,
+  onExpenses,
 }: Props) {
   const { data: rawRecords = [], isLoading } = useGetAllJobRecords();
   const records = rawRecords as LocalJobRecord[];
@@ -217,6 +235,16 @@ export default function RecordsList({
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Add Employee</span>
               <span className="sm:hidden">Employee</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onExpenses}
+              className="gap-2 font-medium border-border hover:bg-accent/50"
+              data-ocid="header.expenses_button"
+            >
+              <Receipt className="w-4 h-4" />
+              <span className="hidden sm:inline">Expenses</span>
+              <span className="sm:hidden">Exp</span>
             </Button>
             <Button
               variant="outline"
@@ -498,21 +526,57 @@ export default function RecordsList({
           </motion.div>
         </motion.div>
 
-        {/* Search */}
+        {/* Search + Export */}
         {records.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="relative mb-4"
+            className="flex items-center gap-2 mb-4"
           >
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by bill no, material, assign to..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-card border-border focus-visible:ring-primary"
-            />
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by bill no, material, assign to..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 bg-card border-border focus-visible:ring-primary"
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="gap-2 font-medium border-border hover:bg-accent/50 shrink-0"
+                  data-ocid="jobs.export_button"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">
+                  Download Job Records
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  data-ocid="jobs.export_excel_button"
+                  onClick={() => exportJobRecordsExcel(sorted)}
+                  className="gap-2 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                  Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-ocid="jobs.export_pdf_button"
+                  onClick={() => exportJobRecordsPDF(sorted)}
+                  className="gap-2 cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-red-600" />
+                  PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </motion.div>
         )}
 

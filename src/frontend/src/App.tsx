@@ -1,11 +1,12 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useState } from "react";
+import ExpensesForm from "./components/ExpensesForm";
 import JobForm, { type FormData } from "./components/JobForm";
 import RecordsList from "./components/RecordsList";
 import StockForm from "./components/StockForm";
 import { JobType, type LocalJobRecord, Material } from "./hooks/useQueries";
 
-export type AppView = "list" | "new-job" | "edit-job" | "stock";
+export type AppView = "list" | "new-job" | "edit-job" | "stock" | "expenses";
 
 function recordToFormData(record: LocalJobRecord): FormData {
   return {
@@ -65,6 +66,10 @@ export default function App() {
     setEditingRecord(null);
   }
 
+  function goToExpenses() {
+    setView("expenses");
+  }
+
   function handleViewRecord(record: LocalJobRecord) {
     setViewingRecord(record);
   }
@@ -93,6 +98,7 @@ export default function App() {
           onCloseRecord={() => setViewingRecord(null)}
           onEditRecord={goToEditJob}
           onStock={() => setView("stock")}
+          onExpenses={goToExpenses}
         />
       )}
       {view === "new-job" && (
@@ -107,6 +113,7 @@ export default function App() {
         />
       )}
       {view === "stock" && <StockForm onBack={goToList} />}
+      {view === "expenses" && <ExpensesForm onBack={goToList} />}
 
       <Toaster
         toastOptions={{

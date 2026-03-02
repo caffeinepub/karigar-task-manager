@@ -10,6 +10,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -24,6 +32,9 @@ import {
   ArrowLeftRight,
   CalendarDays,
   DollarSign,
+  Download,
+  FileSpreadsheet,
+  FileText,
   Gem,
   Package,
   Pencil,
@@ -46,6 +57,10 @@ import {
   type StockOutEntry,
   useStock,
 } from "../hooks/useStock";
+import {
+  exportStockRecordsExcel,
+  exportStockRecordsPDF,
+} from "../utils/exportData";
 import {
   FormCard,
   FormField,
@@ -589,15 +604,51 @@ export default function StockRecordsList() {
       {!editingEntry && (
         <>
           {entries.length > 0 && (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                data-ocid="stock.search_input"
-                placeholder="Search by type, material, date..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-card border-border"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  data-ocid="stock.search_input"
+                  placeholder="Search by type, material, date..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 bg-card border-border"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 font-medium border-border hover:bg-accent/50 shrink-0"
+                    data-ocid="stock.export_button"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Export</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">
+                    Download Stock Records
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    data-ocid="stock.export_excel_button"
+                    onClick={() => exportStockRecordsExcel(filtered)}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-ocid="stock.export_pdf_button"
+                    onClick={() => exportStockRecordsPDF(filtered)}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4 text-red-600" />
+                    PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
 
