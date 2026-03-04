@@ -1,17 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JobRecord, JobType, Material } from "../backend.d";
 import { useActor } from "./useActor";
+import {
+  SENTINEL_JOB_EXTRAS,
+  isSentinelRecord,
+  readSentinel,
+  writeSentinel,
+} from "./useSentinel";
 
 export type { JobRecord };
 export { JobType, Material };
 
 const LS_KEY = "karigar_records";
+const LS_EXTRAS_KEY = "karigar_job_extras";
 
 export interface LocalJobRecord extends JobRecord {
   assignTo?: string;
   deliveryDate?: string;
   status?: "pending" | "delivered";
 }
+
+// Map of jobId (string) -> extras
+type JobExtrasMap = Record<
+  string,
+  { assignTo?: string; deliveryDate?: string; status?: "pending" | "delivered" }
+>;
 
 function serializeBigInt(_key: string, value: unknown): unknown {
   return typeof value === "bigint" ? value.toString() : value;
@@ -30,15 +43,22 @@ function loadLocalRecords(): LocalJobRecord[] {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return parsed.map(
-      (
-        r: LocalJobRecord & { id: string | bigint; createdAt: string | bigint },
-      ) => ({
-        ...r,
-        id: BigInt(r.id),
-        createdAt: BigInt(r.createdAt),
-      }),
-    );
+    return parsed
+      .filter(
+        (r: LocalJobRecord & { billNo: string }) => !isSentinelRecord(r.billNo),
+      )
+      .map(
+        (
+          r: LocalJobRecord & {
+            id: string | bigint;
+            createdAt: string | bigint;
+          },
+        ) => ({
+          ...r,
+          id: BigInt(r.id),
+          createdAt: BigInt(r.createdAt),
+        }),
+      );
   } catch {
     return [];
   }
@@ -52,29 +72,91 @@ function sameId(a: bigint | unknown, b: bigint | unknown): boolean {
   }
 }
 
+// ---- Job extras (cross-device sync for assignTo / deliveryDate / status) ----
+
+function loadLocalExtras(): JobExtrasMap {
+  try {
+    const raw = localStorage.getItem(LS_EXTRAS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as JobExtrasMap;
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalExtras(map: JobExtrasMap): void {
+  try {
+    localStorage.setItem(LS_EXTRAS_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+function mergeExtras(
+  records: LocalJobRecord[],
+  extras: JobExtrasMap,
+): LocalJobRecord[] {
+  return records.map((r) => {
+    const key = r.id.toString();
+    const ex = extras[key];
+    if (!ex) return r;
+    return {
+      ...r,
+      assignTo: ex.assignTo ?? r.assignTo,
+      deliveryDate: ex.deliveryDate ?? r.deliveryDate,
+      status: ex.status ?? r.status,
+    };
+  });
+}
+
+// ---- Queries ----
+
 export function useGetAllJobRecords() {
   const { actor, isFetching } = useActor();
 
   return useQuery<JobRecord[]>({
     queryKey: ["jobRecords"],
     queryFn: async () => {
-      // Local storage is always the source of truth
+      // Local storage is always the source of truth for immediate load
       const localRecords = loadLocalRecords();
-      if (!actor) return localRecords;
+      const localExtras = loadLocalExtras();
+
+      if (!actor) return mergeExtras(localRecords, localExtras);
 
       try {
         const backendRecords = await actor.getAllJobRecords();
+
+        // Filter out sentinel records from backend results
+        const realBackendRecords = backendRecords.filter(
+          (br) => !isSentinelRecord(br.billNo),
+        );
+
         // Normalise backend IDs to BigInt
-        const normalised: LocalJobRecord[] = backendRecords.map((br) => ({
+        const normalised: LocalJobRecord[] = realBackendRecords.map((br) => ({
           ...(br as LocalJobRecord),
           id: BigInt(String(br.id)),
           createdAt: BigInt(String((br as LocalJobRecord).createdAt ?? 0)),
         }));
 
-        // For each backend record, prefer the local version (it may have assignTo etc.)
+        // Fetch extras sentinel from backend (cross-device assignTo/deliveryDate/status)
+        let backendExtras: JobExtrasMap = {};
+        const extrasData = await readSentinel<JobExtrasMap>(
+          actor,
+          SENTINEL_JOB_EXTRAS,
+        );
+        if (extrasData && typeof extrasData === "object") {
+          backendExtras = extrasData;
+        }
+
+        // Merge extras: backend extras win (cross-device source of truth)
+        const mergedExtras: JobExtrasMap = { ...localExtras, ...backendExtras };
+        saveLocalExtras(mergedExtras);
+
+        // For each backend record, prefer the local version for extras
         const merged: LocalJobRecord[] = normalised.map((br) => {
           const local = localRecords.find((lr) => sameId(lr.id, br.id));
-          return local ? { ...br, ...local, id: br.id } : br;
+          const base = local ? { ...br, ...local, id: br.id } : br;
+          return base;
         });
 
         // Include local-only records (saved when backend was unreachable)
@@ -83,13 +165,25 @@ export function useGetAllJobRecords() {
         );
 
         const finalRecords = [...localOnly, ...merged];
-        saveLocalRecords(finalRecords);
-        return finalRecords;
+
+        // Apply merged extras
+        const withExtras = mergeExtras(finalRecords, mergedExtras);
+
+        // Only update localStorage if we got a non-empty response from backend
+        if (finalRecords.length >= localRecords.length) {
+          saveLocalRecords(withExtras);
+        }
+        return finalRecords.length >= localRecords.length
+          ? withExtras
+          : mergeExtras(localRecords, mergedExtras);
       } catch {
-        // Backend unreachable — return what we have locally
-        return localRecords;
+        // Backend unreachable — return what we have locally with local extras
+        return mergeExtras(localRecords, localExtras);
       }
     },
+    // Always start with localStorage data immediately, don't wait for actor
+    initialData: () => mergeExtras(loadLocalRecords(), loadLocalExtras()),
+    initialDataUpdatedAt: 0, // treat as stale so it re-fetches when actor is ready
     enabled: !isFetching,
     staleTime: 30_000,
   });
@@ -152,6 +246,25 @@ function saveJobLocally(payload: CreateJobPayload): bigint {
   return newId;
 }
 
+function saveExtrasForJob(
+  id: bigint,
+  payload: Pick<CreateJobPayload, "assignTo" | "deliveryDate" | "status">,
+): void {
+  const extras = loadLocalExtras();
+  extras[id.toString()] = {
+    assignTo: payload.assignTo,
+    deliveryDate: payload.deliveryDate,
+    status: payload.status ?? "pending",
+  };
+  saveLocalExtras(extras);
+}
+
+function removeExtrasForJob(id: bigint): void {
+  const extras = loadLocalExtras();
+  delete extras[id.toString()];
+  saveLocalExtras(extras);
+}
+
 export function useCreateJobRecord() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -163,6 +276,7 @@ export function useCreateJobRecord() {
       // Always save locally first so data is never lost
       const localId = saveJobLocally(payload);
       const localRecord = buildLocalRecord(payload, localId);
+      saveExtrasForJob(localId, payload);
 
       try {
         if (!actor) {
@@ -191,6 +305,15 @@ export function useCreateJobRecord() {
         const updated = records.filter((r) => r.id !== localId);
         updated.unshift(record);
         saveLocalRecords(updated);
+
+        // Update extras with the real backend id
+        removeExtrasForJob(localId);
+        saveExtrasForJob(backendId, payload);
+
+        // Sync extras to backend sentinel (fire-and-forget)
+        const allExtras = loadLocalExtras();
+        writeSentinel(actor, SENTINEL_JOB_EXTRAS, allExtras);
+
         return { id: backendId, record };
       } catch {
         // Backend unavailable — local record already saved above
@@ -199,14 +322,12 @@ export function useCreateJobRecord() {
     },
     onSuccess: ({ record }) => {
       // Immediately add the new record to the cache so it shows in the list
-      // without waiting for a re-fetch that might overwrite it
       queryClient.setQueryData<LocalJobRecord[]>(["jobRecords"], (old) => {
         const existing = old ?? [];
         if (existing.find((r) => sameId(r.id, record.id))) return existing;
         return [record, ...existing];
       });
       // Invalidate so the next background fetch picks up any backend changes
-      // but don't refetch immediately (avoids wiping optimistic update)
       queryClient.invalidateQueries({
         queryKey: ["jobRecords"],
         refetchType: "none",
@@ -265,8 +386,19 @@ export function useUpdateJobRecord() {
       ...patch
     }: UpdateJobPayload): Promise<LocalJobRecord> => {
       const updated = updateJobLocally(id, patch);
-      // Best-effort backend sync
+
+      // Update extras locally
+      saveExtrasForJob(id, {
+        assignTo: patch.assignTo ?? updated.assignTo,
+        deliveryDate: patch.deliveryDate ?? updated.deliveryDate,
+        status: patch.status ?? updated.status,
+      });
+
+      // Best-effort backend sync for extras
       if (actor) {
+        const allExtras = loadLocalExtras();
+        writeSentinel(actor, SENTINEL_JOB_EXTRAS, allExtras);
+
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const backendActor = actor as any;
@@ -301,6 +433,16 @@ export function useDeleteJobRecord() {
       // Always remove from localStorage first so it doesn't reappear on refresh
       const records = loadLocalRecords();
       saveLocalRecords(records.filter((r) => !sameId(r.id, jobId)));
+
+      // Remove extras for this job
+      removeExtrasForJob(jobId);
+
+      // Sync updated extras to backend sentinel (fire-and-forget)
+      if (actor) {
+        const allExtras = loadLocalExtras();
+        writeSentinel(actor, SENTINEL_JOB_EXTRAS, allExtras);
+      }
+
       // Attempt backend delete if actor is available (best-effort)
       if (actor) {
         try {

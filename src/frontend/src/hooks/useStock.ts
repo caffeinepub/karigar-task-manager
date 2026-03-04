@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useActor } from "./useActor";
+import { SENTINEL_STOCK, readSentinel, writeSentinel } from "./useSentinel";
 
 export type StockDirection = "in" | "out";
 export type StockInType = "buyback" | "raw_stock";
@@ -55,12 +57,36 @@ function loadStock(): StockEntry[] {
   }
 }
 
-function saveStock(entries: StockEntry[]): void {
+function saveStockLocal(entries: StockEntry[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
 }
 
 export function useStock() {
   const [entries, setEntries] = useState<StockEntry[]>(() => loadStock());
+  const { actor, isFetching } = useActor();
+  const syncedRef = useRef(false);
+
+  // On mount (once actor is ready): sync from backend
+  useEffect(() => {
+    if (!actor || isFetching || syncedRef.current) return;
+    syncedRef.current = true;
+
+    (async () => {
+      const backendData = await readSentinel<StockEntry[]>(
+        actor,
+        SENTINEL_STOCK,
+      );
+      if (backendData && Array.isArray(backendData)) {
+        const localData = loadStock();
+        // Include local-only entries not yet synced to backend
+        const backendIds = new Set(backendData.map((e) => e.id));
+        const localOnly = localData.filter((e) => !backendIds.has(e.id));
+        const merged = [...backendData, ...localOnly];
+        saveStockLocal(merged);
+        setEntries(merged);
+      }
+    })();
+  }, [actor, isFetching]);
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
@@ -80,7 +106,10 @@ export function useStock() {
     } as StockEntry;
     setEntries((prev) => {
       const updated = [newEntry, ...prev];
-      saveStock(updated);
+      saveStockLocal(updated);
+      if (actor) {
+        writeSentinel(actor, SENTINEL_STOCK, updated);
+      }
       return updated;
     });
     return newEntry;
@@ -89,7 +118,10 @@ export function useStock() {
   function removeEntry(id: string) {
     setEntries((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      saveStock(updated);
+      saveStockLocal(updated);
+      if (actor) {
+        writeSentinel(actor, SENTINEL_STOCK, updated);
+      }
       return updated;
     });
   }
@@ -99,7 +131,10 @@ export function useStock() {
       const updated = prev.map((e) =>
         e.id === id ? ({ ...e, ...changes } as StockEntry) : e,
       );
-      saveStock(updated);
+      saveStockLocal(updated);
+      if (actor) {
+        writeSentinel(actor, SENTINEL_STOCK, updated);
+      }
       return updated;
     });
   }

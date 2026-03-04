@@ -55,6 +55,7 @@ import {
   useDeleteJobRecord,
   useGetAllJobRecords,
 } from "../hooks/useQueries";
+import { isSentinelRecord } from "../hooks/useSentinel";
 import {
   type BuybackEntry,
   type StockOutEntry,
@@ -137,7 +138,10 @@ export default function RecordsList({
   onExpenses,
 }: Props) {
   const { data: rawRecords = [], isLoading } = useGetAllJobRecords();
-  const records = rawRecords as LocalJobRecord[];
+  // Filter out any sentinel records that may slip through (extra safety)
+  const records = (rawRecords as LocalJobRecord[]).filter(
+    (r) => !isSentinelRecord(r.billNo),
+  );
   const deleteMutation = useDeleteJobRecord();
   const { entries: stockEntries } = useStock();
   const { expenses } = useExpenses();
@@ -222,7 +226,7 @@ export default function RecordsList({
                 className="font-display text-xl font-bold leading-tight"
                 style={{ color: "oklch(0.22 0.04 50)" }}
               >
-                Karigar Task Manager
+                MKJ Shop Manager
               </h1>
               <p className="text-xs text-muted-foreground hidden sm:block">
                 Jewelry Job Records
@@ -780,21 +784,7 @@ export default function RecordsList({
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-5 px-4">
-        <p className="text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()}. Built with{" "}
-          <span style={{ color: "oklch(0.72 0.148 60)" }}>♥</span> using{" "}
-          <a
-            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
-          >
-            caffeine.ai
-          </a>
-        </p>
-      </footer>
+      {/* Footer removed */}
 
       {/* Detail Modal */}
       <AnimatePresence>

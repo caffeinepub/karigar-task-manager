@@ -69,7 +69,7 @@ export function exportJobRecordsExcel(records: LocalJobRecord[]) {
 export function exportJobRecordsPDF(records: LocalJobRecord[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   doc.setFontSize(14);
-  doc.text("Karigar Task Manager - Job Records", 14, 14);
+  doc.text("MKJ Shop Manager - Job Records", 14, 14);
   doc.setFontSize(9);
   doc.text(`Generated: ${new Date().toLocaleDateString("en-IN")}`, 14, 21);
 
@@ -157,7 +157,7 @@ export function exportStockRecordsExcel(entries: StockEntry[]) {
 export function exportStockRecordsPDF(entries: StockEntry[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   doc.setFontSize(14);
-  doc.text("Karigar Task Manager - Stock Records", 14, 14);
+  doc.text("MKJ Shop Manager - Stock Records", 14, 14);
   doc.setFontSize(9);
   doc.text(`Generated: ${new Date().toLocaleDateString("en-IN")}`, 14, 21);
 
@@ -211,7 +211,7 @@ export function exportExpenseRecordsExcel(expenses: ExpenseRecord[]) {
 export function exportExpenseRecordsPDF(expenses: ExpenseRecord[]) {
   const doc = new jsPDF({ orientation: "portrait" });
   doc.setFontSize(14);
-  doc.text("Karigar Task Manager - Expense Records", 14, 14);
+  doc.text("MKJ Shop Manager - Expense Records", 14, 14);
   doc.setFontSize(9);
   doc.text(`Generated: ${new Date().toLocaleDateString("en-IN")}`, 14, 21);
 

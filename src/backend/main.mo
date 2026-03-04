@@ -1,31 +1,33 @@
+import Map "mo:core/Map";
 import Text "mo:core/Text";
 import Array "mo:core/Array";
 import Float "mo:core/Float";
-import Order "mo:core/Order";
 import Iter "mo:core/Iter";
+import Order "mo:core/Order";
 import Time "mo:core/Time";
 import Nat "mo:core/Nat";
 import Runtime "mo:core/Runtime";
-import Map "mo:core/Map";
+import Migration "migration";
+import Int "mo:core/Int";
 
+// Use migration module for upgrades
+(with migration = Migration.run)
 actor {
+  // Type definitions
   type JobId = Nat;
 
   type JobType = {
-    #new;
+    #new_;
     #repair;
   };
 
   module JobType {
-    public func toText(jobType : JobType) : Text {
-      switch (jobType) {
-        case (#new) { "new" };
-        case (#repair) { "repair" };
-      };
-    };
-
     public func compare(jobType1 : JobType, jobType2 : JobType) : Order.Order {
-      Text.compare(toText(jobType1), toText(jobType2));
+      switch (jobType1, jobType2) {
+        case (#new_, #repair) { #less };
+        case (#repair, #new_) { #greater };
+        case (_, _) { #equal };
+      };
     };
   };
 
@@ -36,16 +38,16 @@ actor {
   };
 
   module Material {
-    public func toText(material : Material) : Text {
-      switch (material) {
-        case (#gold) { "gold" };
-        case (#silver) { "silver" };
-        case (#other) { "other" };
-      };
-    };
-
     public func compare(material1 : Material, material2 : Material) : Order.Order {
-      Text.compare(toText(material1), toText(material2));
+      switch (material1, material2) {
+        case (#gold, #silver) { #less };
+        case (#silver, #gold) { #greater };
+        case (#gold, #other) { #less };
+        case (#other, #gold) { #greater };
+        case (#silver, #other) { #less };
+        case (#other, #silver) { #greater };
+        case (_, _) { #equal };
+      };
     };
   };
 
@@ -77,6 +79,8 @@ actor {
 
   var nextJobId = 1;
   let jobRecords = Map.empty<JobId, JobRecord>();
+
+  // JobRecord Functions
 
   public shared ({ caller }) func createJobRecord(
     date : Text,
