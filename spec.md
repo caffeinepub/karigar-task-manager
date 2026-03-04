@@ -1,50 +1,37 @@
 # MKJ Shop Manager
 
 ## Current State
-
-The app has:
-- A Motoko backend storing only basic job records (missing assignTo, deliveryDate, status fields)
-- All employee data stored in localStorage only (key: `karigar_employees`)
-- All stock data stored in localStorage only (key: `karigar_stock`)
-- All expense data stored in localStorage only (key: `expenses_records`)
-- Job records partially stored in backend but with missing fields; frontend falls back to localStorage
-- Data is NOT shared across devices -- each device/browser has its own separate localStorage
+The app has a dashboard (RecordsList) with job stats, stock overview, expense summary, and records table. The header has buttons: Add Employee, Expenses, Stock, New Job. There are separate views for Stock (StockForm) and Expenses (ExpensesForm). Data is persisted via localStorage and synced to backend using sentinel pattern (useStock, useExpenses hooks).
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `Employee` data model with CRUD (name, phone)
-- Backend: `StockEntry` data model with full fields for buyback, raw_stock, stock_out types
-- Backend: `ExpenseRecord` data model with all fields (date, amount, category, remarks, description)
-- Backend: Update `JobRecord` to include `assignTo`, `deliveryDate`, `status` fields
-- Backend: `updateJobRecord` function to update all job fields
-- Frontend: Migrate all hooks (useEmployees, useStock, useExpenses, useQueries) to use backend canister as primary source of truth
-- Frontend: Keep localStorage as a local cache/fallback for offline resilience, but always sync to backend on each write
-- Frontend: On app load, fetch all data from backend and update localStorage cache
+- New "Exchange Scrap" button in the header (RecordsList.tsx)
+- New `AppView` state: `"exchange-scrap"` in App.tsx
+- New hook `useExchangeScrap.ts` (mirrors useStock/useExpenses pattern with localStorage + backend sentinel sync)
+- New `ExchangeScrapForm.tsx` component with:
+  - Entry tab: form with Date, Exchange Scrap Weight (g), Given Pure Weight (g), Old Scrap dropdown (Resale / Refine), Remarks
+  - Records tab: list of past exchange scrap entries with edit/delete
+- New dashboard card "Exchange Scrap" in RecordsList.tsx showing:
+  - Total exchange count
+  - Total exchange scrap weight (sum)
+  - Total given pure weight (sum)
+  - Breakdown by Old Scrap type (Resale vs Refine count/weight)
+  - "View All →" button navigating to exchange scrap view
 
 ### Modify
-- Backend `JobRecord` type: add `assignTo: ?Text`, `deliveryDate: ?Text`, `status: ?Text`
-- Backend `createJobRecord`: accept all new fields
-- Frontend `useQueries.ts`: backend is source of truth; on load fetch from backend, merge with any unsynced local records
-- Frontend `useEmployees.ts`: persist to backend; load from backend on mount
-- Frontend `useStock.ts`: persist to backend; load from backend on mount
-- Frontend `useExpenses.ts`: persist to backend; load from backend on mount
+- `App.tsx`: add `exchange-scrap` to `AppView` union type, add `onExchangeScrap` handler, render `<ExchangeScrapForm>` when view is `exchange-scrap`
+- `RecordsList.tsx`:
+  - Add `onExchangeScrap` prop and "Exchange Scrap" header button (with recycling/exchange icon)
+  - Add Exchange Scrap summary card to the dashboard stats section (after expense summary)
+- `src/hooks/useSentinel.ts` (or wherever sentinel keys are defined): add new sentinel key for exchange scrap
 
 ### Remove
-- Reliance on localStorage as sole storage for employees, stock, expenses
+- Nothing removed
 
 ## Implementation Plan
-
-1. Generate new Motoko backend with:
-   - Full JobRecord (with assignTo, deliveryDate, status, all existing fields)
-   - createJobRecord / updateJobRecord / deleteJobRecord / getAllJobRecords
-   - Employee CRUD: createEmployee, deleteEmployee, getAllEmployees
-   - StockEntry CRUD: createStockEntry, updateStockEntry, deleteStockEntry, getAllStockEntries (supports buyback/raw_stock/stock_out types with variant type)
-   - ExpenseRecord CRUD: createExpense, updateExpense, deleteExpense, getAllExpenses
-
-2. Update frontend hooks to:
-   - On mount: fetch from backend, update local cache
-   - On create/update/delete: write to backend first, update local cache on success
-   - Fallback to localStorage if backend unreachable
-
-3. Keep localStorage as a resilience cache so the app works offline and data loads instantly
+1. Create `src/hooks/useExchangeScrap.ts` with ExchangeScrapEntry type, localStorage CRUD, backend sentinel sync (same pattern as useStock/useExpenses)
+2. Create `src/components/ExchangeScrapForm.tsx` with entry form + records list tab (edit/delete support)
+3. Update `App.tsx`: add `exchange-scrap` view, handler, and render ExchangeScrapForm
+4. Update `RecordsList.tsx`: add `onExchangeScrap` prop, header button, and dashboard summary card
+5. Validate with typecheck/build

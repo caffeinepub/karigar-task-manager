@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useActor } from "./useActor";
 import { SENTINEL_STOCK, readSentinel, writeSentinel } from "./useSentinel";
 
@@ -64,28 +64,47 @@ function saveStockLocal(entries: StockEntry[]): void {
 export function useStock() {
   const [entries, setEntries] = useState<StockEntry[]>(() => loadStock());
   const { actor, isFetching } = useActor();
-  const syncedRef = useRef(false);
 
-  // On mount (once actor is ready): sync from backend
+  // Always sync from backend on every mount when actor is ready.
+  // No syncedActorRef guard — the backend is the source of truth and every
+  // device (phone, laptop) must fetch fresh data on every app open.
   useEffect(() => {
-    if (!actor || isFetching || syncedRef.current) return;
-    syncedRef.current = true;
+    if (!actor || isFetching) return;
 
+    let cancelled = false;
     (async () => {
       const backendData = await readSentinel<StockEntry[]>(
         actor,
         SENTINEL_STOCK,
       );
+      if (cancelled) return;
+
       if (backendData && Array.isArray(backendData)) {
         const localData = loadStock();
         // Include local-only entries not yet synced to backend
         const backendIds = new Set(backendData.map((e) => e.id));
         const localOnly = localData.filter((e) => !backendIds.has(e.id));
         const merged = [...backendData, ...localOnly];
+        // If there were local-only entries, push full merged list back to backend
+        if (localOnly.length > 0) {
+          writeSentinel(actor, SENTINEL_STOCK, merged);
+        }
         saveStockLocal(merged);
         setEntries(merged);
+      } else {
+        // Backend returned nothing — push local data to backend so it's available on other devices
+        const localData = loadStock();
+        if (localData.length > 0) {
+          writeSentinel(actor, SENTINEL_STOCK, localData);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Re-run whenever actor becomes available (covers page re-opens & device switches)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actor, isFetching]);
 
   useEffect(() => {
@@ -104,39 +123,33 @@ export function useStock() {
       id: Date.now().toString(),
       createdAt: Date.now(),
     } as StockEntry;
-    setEntries((prev) => {
-      const updated = [newEntry, ...prev];
-      saveStockLocal(updated);
-      if (actor) {
-        writeSentinel(actor, SENTINEL_STOCK, updated);
-      }
-      return updated;
-    });
+    const updated = [newEntry, ...entries];
+    saveStockLocal(updated);
+    setEntries(updated);
+    if (actor) {
+      writeSentinel(actor, SENTINEL_STOCK, updated);
+    }
     return newEntry;
   }
 
   function removeEntry(id: string) {
-    setEntries((prev) => {
-      const updated = prev.filter((e) => e.id !== id);
-      saveStockLocal(updated);
-      if (actor) {
-        writeSentinel(actor, SENTINEL_STOCK, updated);
-      }
-      return updated;
-    });
+    const updated = entries.filter((e) => e.id !== id);
+    saveStockLocal(updated);
+    setEntries(updated);
+    if (actor) {
+      writeSentinel(actor, SENTINEL_STOCK, updated);
+    }
   }
 
   function updateEntry(id: string, changes: Partial<StockEntry>) {
-    setEntries((prev) => {
-      const updated = prev.map((e) =>
-        e.id === id ? ({ ...e, ...changes } as StockEntry) : e,
-      );
-      saveStockLocal(updated);
-      if (actor) {
-        writeSentinel(actor, SENTINEL_STOCK, updated);
-      }
-      return updated;
-    });
+    const updated = entries.map((e) =>
+      e.id === id ? ({ ...e, ...changes } as StockEntry) : e,
+    );
+    saveStockLocal(updated);
+    setEntries(updated);
+    if (actor) {
+      writeSentinel(actor, SENTINEL_STOCK, updated);
+    }
   }
 
   return { entries, addEntry, removeEntry, updateEntry };

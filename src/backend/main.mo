@@ -1,5 +1,4 @@
 import Map "mo:core/Map";
-import Text "mo:core/Text";
 import Array "mo:core/Array";
 import Float "mo:core/Float";
 import Iter "mo:core/Iter";
@@ -7,11 +6,11 @@ import Order "mo:core/Order";
 import Time "mo:core/Time";
 import Nat "mo:core/Nat";
 import Runtime "mo:core/Runtime";
-import Migration "migration";
+
+import Text "mo:core/Text";
 import Int "mo:core/Int";
 
-// Use migration module for upgrades
-(with migration = Migration.run)
+
 actor {
   // Type definitions
   type JobId = Nat;
@@ -81,8 +80,7 @@ actor {
   let jobRecords = Map.empty<JobId, JobRecord>();
 
   // JobRecord Functions
-
-  public shared ({ caller }) func createJobRecord(
+  public func createJobRecord(
     date : Text,
     billNo : Text,
     material : Material,
@@ -126,18 +124,18 @@ actor {
     jobId;
   };
 
-  public query ({ caller }) func getAllJobRecords() : async [JobRecord] {
+  public query func getAllJobRecords() : async [JobRecord] {
     jobRecords.values().toArray().sort(JobRecord.compareByCreatedAtDesc);
   };
 
-  public query ({ caller }) func getJobRecord(jobId : JobId) : async JobRecord {
+  public query func getJobRecord(jobId : JobId) : async JobRecord {
     switch (jobRecords.get(jobId)) {
       case (null) { Runtime.trap("Job record does not exist") };
       case (?jobRecord) { jobRecord };
     };
   };
 
-  public shared ({ caller }) func deleteJobRecord(jobId : JobId) : async () {
+  public func deleteJobRecord(jobId : JobId) : async () {
     if (not jobRecords.containsKey(jobId)) {
       Runtime.trap("Job record does not exist");
     };

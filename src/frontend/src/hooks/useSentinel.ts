@@ -17,6 +17,7 @@ export const SENTINEL_EMPLOYEES = "__EMPLOYEES_DATA__";
 export const SENTINEL_STOCK = "__STOCK_DATA__";
 export const SENTINEL_EXPENSES = "__EXPENSES_DATA__";
 export const SENTINEL_JOB_EXTRAS = "__JOB_EXTRAS__";
+export const SENTINEL_EXCHANGE_SCRAP = "__EXCHANGE_SCRAP_DATA__";
 
 export function isSentinelRecord(billNo: string): boolean {
   return billNo.startsWith("__") && billNo.endsWith("__");

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useActor } from "./useActor";
 import { SENTINEL_EXPENSES, readSentinel, writeSentinel } from "./useSentinel";
 
@@ -47,28 +47,47 @@ export function useExpenses() {
     loadExpenses(),
   );
   const { actor, isFetching } = useActor();
-  const syncedRef = useRef(false);
 
-  // On mount (once actor is ready): sync from backend
+  // Always sync from backend on every mount when actor is ready.
+  // No syncedActorRef guard — the backend is the source of truth and every
+  // device (phone, laptop) must fetch fresh data on every app open.
   useEffect(() => {
-    if (!actor || isFetching || syncedRef.current) return;
-    syncedRef.current = true;
+    if (!actor || isFetching) return;
 
+    let cancelled = false;
     (async () => {
       const backendData = await readSentinel<ExpenseRecord[]>(
         actor,
         SENTINEL_EXPENSES,
       );
+      if (cancelled) return;
+
       if (backendData && Array.isArray(backendData)) {
         const localData = loadExpenses();
         // Include local-only entries not yet synced to backend
         const backendIds = new Set(backendData.map((e) => e.id));
         const localOnly = localData.filter((e) => !backendIds.has(e.id));
         const merged = [...backendData, ...localOnly];
+        // If there were local-only entries, push full merged list back to backend
+        if (localOnly.length > 0) {
+          writeSentinel(actor, SENTINEL_EXPENSES, merged);
+        }
         saveExpensesLocal(merged);
         setExpenses(merged);
+      } else {
+        // Backend returned nothing — push local data to backend so it's available on other devices
+        const localData = loadExpenses();
+        if (localData.length > 0) {
+          writeSentinel(actor, SENTINEL_EXPENSES, localData);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Re-run whenever actor becomes available (covers page re-opens & device switches)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actor, isFetching]);
 
   // Persist to localStorage whenever expenses change (keeps cache fresh)
@@ -82,36 +101,35 @@ export function useExpenses() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       createdAt: new Date().toISOString(),
     };
-    setExpenses((prev) => {
-      const updated = [record, ...prev];
-      if (actor) {
-        writeSentinel(actor, SENTINEL_EXPENSES, updated);
-      }
-      return updated;
-    });
+    const updated = [record, ...expenses];
+    saveExpensesLocal(updated);
+    setExpenses(updated);
+    if (actor) {
+      writeSentinel(actor, SENTINEL_EXPENSES, updated);
+    }
   }
 
   function updateExpense(
     id: string,
     changes: Partial<Omit<ExpenseRecord, "id" | "createdAt">>,
   ): void {
-    setExpenses((prev) => {
-      const updated = prev.map((e) => (e.id === id ? { ...e, ...changes } : e));
-      if (actor) {
-        writeSentinel(actor, SENTINEL_EXPENSES, updated);
-      }
-      return updated;
-    });
+    const updated = expenses.map((e) =>
+      e.id === id ? { ...e, ...changes } : e,
+    );
+    saveExpensesLocal(updated);
+    setExpenses(updated);
+    if (actor) {
+      writeSentinel(actor, SENTINEL_EXPENSES, updated);
+    }
   }
 
   function deleteExpense(id: string): void {
-    setExpenses((prev) => {
-      const updated = prev.filter((e) => e.id !== id);
-      if (actor) {
-        writeSentinel(actor, SENTINEL_EXPENSES, updated);
-      }
-      return updated;
-    });
+    const updated = expenses.filter((e) => e.id !== id);
+    saveExpensesLocal(updated);
+    setExpenses(updated);
+    if (actor) {
+      writeSentinel(actor, SENTINEL_EXPENSES, updated);
+    }
   }
 
   return { expenses, addExpense, updateExpense, deleteExpense };

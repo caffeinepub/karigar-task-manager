@@ -152,11 +152,21 @@ export function useGetAllJobRecords() {
         const mergedExtras: JobExtrasMap = { ...localExtras, ...backendExtras };
         saveLocalExtras(mergedExtras);
 
-        // For each backend record, prefer the local version for extras
+        // For each backend record, prefer backend extras (cross-device truth),
+        // then fall back to local data for extra fields not stored in backend schema
         const merged: LocalJobRecord[] = normalised.map((br) => {
+          const key = br.id.toString();
+          const backendEx = backendExtras[key];
           const local = localRecords.find((lr) => sameId(lr.id, br.id));
-          const base = local ? { ...br, ...local, id: br.id } : br;
-          return base;
+          return {
+            ...br,
+            // Backend extras win (they represent the latest cross-device state)
+            assignTo: backendEx?.assignTo ?? local?.assignTo ?? br.assignTo,
+            deliveryDate:
+              backendEx?.deliveryDate ?? local?.deliveryDate ?? br.deliveryDate,
+            status: backendEx?.status ?? local?.status ?? br.status,
+            id: br.id,
+          };
         });
 
         // Include local-only records (saved when backend was unreachable)
@@ -164,18 +174,54 @@ export function useGetAllJobRecords() {
           (lr) => !normalised.some((br) => sameId(br.id, lr.id)),
         );
 
+        // If we have local-only records, push them to the backend (they were saved offline)
+        if (localOnly.length > 0 && actor) {
+          // Best-effort: sync local-only records to backend
+          for (const lr of localOnly) {
+            try {
+              const backendId = await actor.createJobRecord(
+                lr.date,
+                lr.billNo,
+                lr.material,
+                lr.jobType,
+                lr.itemName ?? null,
+                lr.givenMaterialWeight ?? null,
+                lr.workReceivedDate ?? null,
+                lr.receivedItemWeight ?? null,
+                lr.returnScrapWeight ?? null,
+                lr.lossWeight ?? null,
+                lr.otherCharge ?? null,
+                lr.makingChargeCustomer ?? null,
+                lr.makingChargeKarigar ?? null,
+                lr.workDescription ?? null,
+                lr.remarks ?? null,
+              );
+              // Update the local record id to the backend-assigned id
+              const records = loadLocalRecords();
+              const updated = records.map((r) =>
+                sameId(r.id, lr.id) ? { ...r, id: backendId } : r,
+              );
+              saveLocalRecords(updated);
+            } catch {
+              // Ignore errors during background sync
+            }
+          }
+        }
+
         const finalRecords = [...localOnly, ...merged];
 
         // Apply merged extras
         const withExtras = mergeExtras(finalRecords, mergedExtras);
 
-        // Only update localStorage if we got a non-empty response from backend
-        if (finalRecords.length >= localRecords.length) {
-          saveLocalRecords(withExtras);
+        // If backend has records but local has none (fresh device), push extras to backend
+        if (normalised.length > 0 && Object.keys(localExtras).length > 0) {
+          // Already have backend extras merged — no action needed
         }
-        return finalRecords.length >= localRecords.length
-          ? withExtras
-          : mergeExtras(localRecords, mergedExtras);
+
+        // Save the merged result to localStorage for offline use
+        saveLocalRecords(withExtras);
+
+        return withExtras;
       } catch {
         // Backend unreachable — return what we have locally with local extras
         return mergeExtras(localRecords, localExtras);
@@ -183,9 +229,11 @@ export function useGetAllJobRecords() {
     },
     // Always start with localStorage data immediately, don't wait for actor
     initialData: () => mergeExtras(loadLocalRecords(), loadLocalExtras()),
-    initialDataUpdatedAt: 0, // treat as stale so it re-fetches when actor is ready
+    initialDataUpdatedAt: 0, // treat as stale so it always re-fetches when actor is ready
     enabled: !isFetching,
-    staleTime: 30_000,
+    // staleTime: 0 ensures React Query always re-fetches on mount so every device
+    // (phone, laptop) sees the latest backend data every time the app opens.
+    staleTime: 0,
   });
 }
 

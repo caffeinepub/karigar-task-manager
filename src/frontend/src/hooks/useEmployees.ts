@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useActor } from "./useActor";
 import { SENTINEL_EMPLOYEES, readSentinel, writeSentinel } from "./useSentinel";
 
@@ -27,18 +27,21 @@ function saveEmployeesLocal(employees: Employee[]): void {
 export function useEmployees() {
   const [employees, setEmployees] = useState<Employee[]>(() => loadEmployees());
   const { actor, isFetching } = useActor();
-  const syncedRef = useRef(false);
 
-  // On mount (once actor is ready): sync from backend — backend wins for cross-device truth
+  // Always sync from backend on every mount when actor is ready.
+  // No syncedActorRef guard — the backend is the source of truth and every
+  // device (phone, laptop) must fetch fresh data on every app open.
   useEffect(() => {
-    if (!actor || isFetching || syncedRef.current) return;
-    syncedRef.current = true;
+    if (!actor || isFetching) return;
 
+    let cancelled = false;
     (async () => {
       const backendData = await readSentinel<Employee[]>(
         actor,
         SENTINEL_EMPLOYEES,
       );
+      if (cancelled) return;
+
       if (backendData && Array.isArray(backendData)) {
         // Merge: backend data wins (it's the cross-device source of truth)
         const localData = loadEmployees();
@@ -46,10 +49,26 @@ export function useEmployees() {
         const backendIds = new Set(backendData.map((e) => e.id));
         const localOnly = localData.filter((e) => !backendIds.has(e.id));
         const merged = [...backendData, ...localOnly];
+        // If there were local-only entries, push full merged list back to backend
+        if (localOnly.length > 0) {
+          writeSentinel(actor, SENTINEL_EMPLOYEES, merged);
+        }
         saveEmployeesLocal(merged);
         setEmployees(merged);
+      } else {
+        // Backend returned nothing — push local data to backend so it's available on other devices
+        const localData = loadEmployees();
+        if (localData.length > 0) {
+          writeSentinel(actor, SENTINEL_EMPLOYEES, localData);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Re-run whenever actor becomes available (covers page re-opens & device switches)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actor, isFetching]);
 
   // Keep in sync if another tab updates
@@ -69,27 +88,23 @@ export function useEmployees() {
       name: name.trim(),
       phone: phone.trim(),
     };
-    setEmployees((prev) => {
-      const updated = [...prev, newEmployee];
-      saveEmployeesLocal(updated);
-      // Fire-and-forget backend sync
-      if (actor) {
-        writeSentinel(actor, SENTINEL_EMPLOYEES, updated);
-      }
-      return updated;
-    });
+    const updated = [...employees, newEmployee];
+    saveEmployeesLocal(updated);
+    setEmployees(updated);
+    // Fire-and-forget backend sync
+    if (actor) {
+      writeSentinel(actor, SENTINEL_EMPLOYEES, updated);
+    }
   }
 
   function removeEmployee(id: string) {
-    setEmployees((prev) => {
-      const updated = prev.filter((e) => e.id !== id);
-      saveEmployeesLocal(updated);
-      // Fire-and-forget backend sync
-      if (actor) {
-        writeSentinel(actor, SENTINEL_EMPLOYEES, updated);
-      }
-      return updated;
-    });
+    const updated = employees.filter((e) => e.id !== id);
+    saveEmployeesLocal(updated);
+    setEmployees(updated);
+    // Fire-and-forget backend sync
+    if (actor) {
+      writeSentinel(actor, SENTINEL_EMPLOYEES, updated);
+    }
   }
 
   return { employees, addEmployee, removeEmployee };
