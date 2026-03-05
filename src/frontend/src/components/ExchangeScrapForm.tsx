@@ -22,10 +22,16 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  Download,
+  FileText,
   List,
   Pencil,
   Plus,
   Repeat,
+  Sheet,
   Trash2,
   Weight,
 } from "lucide-react";
@@ -37,6 +43,10 @@ import {
   type OldScrapType,
   useExchangeScrap,
 } from "../hooks/useExchangeScrap";
+import {
+  exportExchangeScrapExcel,
+  exportExchangeScrapPDF,
+} from "../utils/exportData";
 import { FormCard, FormField, SectionHeading } from "./form-steps/FormHelpers";
 
 interface Props {
@@ -52,6 +62,8 @@ const emptyForm = {
 };
 
 type ExchangeTab = "entry" | "records";
+type SortColumn = "date" | "oldScrap";
+type SortDir = "asc" | "desc";
 
 function formatDate(dateStr: string): string {
   try {
@@ -68,6 +80,8 @@ export default function ExchangeScrapForm({ onBack }: Props) {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const {
     exchangeScrapEntries,
@@ -130,6 +144,33 @@ export default function ExchangeScrapForm({ onBack }: Props) {
     setDeleteTarget(null);
     toast.success("Entry deleted");
   }
+
+  function handleSortClick(col: SortColumn) {
+    if (col === sortColumn) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(col);
+      setSortDir("asc");
+    }
+  }
+
+  function SortIcon({ col }: { col: SortColumn }) {
+    if (sortColumn !== col)
+      return <ChevronsUpDown className="w-3 h-3 ml-0.5 opacity-50" />;
+    return sortDir === "asc" ? (
+      <ChevronUp className="w-3 h-3 ml-0.5" />
+    ) : (
+      <ChevronDown className="w-3 h-3 ml-0.5" />
+    );
+  }
+
+  const sortedEntries = [...exchangeScrapEntries].sort((a, b) => {
+    const aVal = sortColumn === "date" ? a.date : a.oldScrap.toLowerCase();
+    const bVal = sortColumn === "date" ? b.date : b.oldScrap.toLowerCase();
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -215,6 +256,30 @@ export default function ExchangeScrapForm({ onBack }: Props) {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}
             >
+              {exchangeScrapEntries.length > 0 && (
+                <div className="flex justify-end gap-2 mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs font-medium"
+                    onClick={() => exportExchangeScrapExcel(sortedEntries)}
+                    data-ocid="exchange-scrap.export_excel_button"
+                  >
+                    <Sheet className="w-3.5 h-3.5" />
+                    Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs font-medium"
+                    onClick={() => exportExchangeScrapPDF(sortedEntries)}
+                    data-ocid="exchange-scrap.export_pdf_button"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    PDF
+                  </Button>
+                </div>
+              )}
               {exchangeScrapEntries.length === 0 ? (
                 <div
                   className="rounded-2xl border border-border bg-card p-12 text-center shadow-warm"
@@ -244,24 +309,39 @@ export default function ExchangeScrapForm({ onBack }: Props) {
                 <div className="rounded-2xl border border-border bg-card shadow-warm overflow-hidden">
                   {/* Table header */}
                   <div className="hidden sm:grid grid-cols-[100px_100px_100px_90px_1fr_auto] gap-3 px-4 py-3 border-b border-border bg-muted/30">
-                    {[
-                      "Date",
-                      "Exch. Scrap Wt",
-                      "Given Pure Wt",
-                      "Old Scrap",
-                      "Remarks",
-                      "",
-                    ].map((h) => (
-                      <span
-                        key={h}
-                        className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                      >
-                        {h}
-                      </span>
-                    ))}
+                    {/* Date - sortable */}
+                    <button
+                      type="button"
+                      onClick={() => handleSortClick("date")}
+                      className="flex items-center gap-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                      data-ocid="exchange-scrap.sort_date_button"
+                    >
+                      Date
+                      <SortIcon col="date" />
+                    </button>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Exch. Scrap Wt
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Given Pure Wt
+                    </span>
+                    {/* Old Scrap - sortable */}
+                    <button
+                      type="button"
+                      onClick={() => handleSortClick("oldScrap")}
+                      className="flex items-center gap-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                      data-ocid="exchange-scrap.sort_old_scrap_button"
+                    >
+                      Old Scrap
+                      <SortIcon col="oldScrap" />
+                    </button>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Remarks
+                    </span>
+                    <span />
                   </div>
                   <AnimatePresence initial={false}>
-                    {exchangeScrapEntries.map((entry, i) => (
+                    {sortedEntries.map((entry, i) => (
                       <motion.div
                         key={entry.id}
                         initial={{ opacity: 0, x: -8 }}
@@ -269,7 +349,7 @@ export default function ExchangeScrapForm({ onBack }: Props) {
                         exit={{ opacity: 0, x: 8, height: 0 }}
                         transition={{ delay: i * 0.03, duration: 0.2 }}
                         className={`flex flex-col sm:grid sm:grid-cols-[100px_100px_100px_90px_1fr_auto] sm:items-center gap-2 sm:gap-3 px-4 py-4 ${
-                          i < exchangeScrapEntries.length - 1
+                          i < sortedEntries.length - 1
                             ? "border-b border-border"
                             : ""
                         } hover:bg-accent/20 transition-colors duration-150`}

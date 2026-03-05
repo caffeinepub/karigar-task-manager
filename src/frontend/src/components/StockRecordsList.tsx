@@ -38,6 +38,7 @@ import {
   Gem,
   Package,
   Pencil,
+  RefreshCw,
   Search,
   Trash2,
   User,
@@ -50,6 +51,7 @@ import { toast } from "sonner";
 import { useEmployees } from "../hooks/useEmployees";
 import {
   type BuybackEntry,
+  type ExchangeNewOrderEntry,
   type RawStockEntry,
   type StockEntry,
   type StockItem,
@@ -80,11 +82,13 @@ function formatDate(dateStr: string): string {
 function typeLabel(type: StockEntry["type"]): string {
   switch (type) {
     case "buyback":
-      return "Buyback";
+      return "Buy from Customer";
     case "raw_stock":
-      return "Raw Stock";
+      return "Raw Stock Bought";
     case "stock_out":
       return "Stock Out";
+    case "exchange_new_order":
+      return "Exchange Order";
   }
 }
 
@@ -96,6 +100,8 @@ function typeBadgeClass(type: StockEntry["type"]): string {
       return "bg-green-500/10 text-green-700 border-green-400/30 dark:text-green-400";
     case "stock_out":
       return "bg-red-500/10 text-red-700 border-red-400/30 dark:text-red-400";
+    case "exchange_new_order":
+      return "bg-purple-500/10 text-purple-700 border-purple-400/30 dark:text-purple-400";
   }
 }
 
@@ -116,8 +122,8 @@ function EditBuyback({
       <div className="flex items-center justify-between mb-4">
         <SectionHeading
           icon={<ArrowLeftRight />}
-          title="Edit Buyback Entry"
-          subtitle="Update buyback stock information"
+          title="Edit Buy from Customer"
+          subtitle="Update customer buyback information"
         />
         <Button
           variant="ghost"
@@ -156,7 +162,7 @@ function EditBuyback({
             </SelectContent>
           </Select>
         </FormField>
-        <FormField label="Total Scrap Weight">
+        <FormField label="Scrap Weight">
           <div className="relative">
             <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
@@ -194,9 +200,11 @@ function EditBuyback({
             </span>
           </div>
         </FormField>
-        <FormField label="Current Rate">
+        <FormField label="Market Rate (₹ per gram)">
           <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+              ₹
+            </span>
             <Input
               type="number"
               min="0"
@@ -206,13 +214,15 @@ function EditBuyback({
                 setForm((p) => ({ ...p, currentRate: e.target.value }))
               }
               placeholder="0.00"
-              className="pl-9"
+              className="pl-7"
             />
           </div>
         </FormField>
-        <FormField label="Given Rate">
+        <FormField label="Given Rate (per gram)">
           <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+              ₹
+            </span>
             <Input
               type="number"
               min="0"
@@ -222,13 +232,15 @@ function EditBuyback({
                 setForm((p) => ({ ...p, givenRate: e.target.value }))
               }
               placeholder="0.00"
-              className="pl-9"
+              className="pl-7"
             />
           </div>
         </FormField>
         <FormField label="Amount">
           <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+              ₹
+            </span>
             <Input
               type="number"
               min="0"
@@ -238,7 +250,7 @@ function EditBuyback({
                 setForm((p) => ({ ...p, amount: e.target.value }))
               }
               placeholder="0.00"
-              className="pl-9"
+              className="pl-7"
             />
           </div>
         </FormField>
@@ -246,7 +258,7 @@ function EditBuyback({
           <RadioGroup
             options={[
               { value: "resale", label: "Resale" },
-              { value: "scrap", label: "Scrap" },
+              { value: "refine", label: "Refine" },
             ]}
             value={form.item}
             onChange={(v) => setForm((p) => ({ ...p, item: v as StockItem }))}
@@ -296,7 +308,7 @@ function EditRawStock({
       <div className="flex items-center justify-between mb-4">
         <SectionHeading
           icon={<Gem />}
-          title="Edit Raw Stock Entry"
+          title="Edit Raw Stock Bought"
           subtitle="Update raw stock information"
         />
         <Button
@@ -355,9 +367,11 @@ function EditRawStock({
             </span>
           </div>
         </FormField>
-        <FormField label="Current Rate">
+        <FormField label="Market Rate (per gram)">
           <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+              ₹
+            </span>
             <Input
               type="number"
               min="0"
@@ -367,13 +381,15 @@ function EditRawStock({
                 setForm((p) => ({ ...p, currentRate: e.target.value }))
               }
               placeholder="0.00"
-              className="pl-9"
+              className="pl-7"
             />
           </div>
         </FormField>
         <FormField label="Amount">
           <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+              ₹
+            </span>
             <Input
               type="number"
               min="0"
@@ -383,9 +399,20 @@ function EditRawStock({
                 setForm((p) => ({ ...p, amount: e.target.value }))
               }
               placeholder="0.00"
-              className="pl-9"
+              className="pl-7"
             />
           </div>
+        </FormField>
+        <FormField label="Remarks">
+          <Textarea
+            value={form.remarks ?? ""}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, remarks: e.target.value }))
+            }
+            placeholder="Any additional notes..."
+            className="resize-none"
+            rows={3}
+          />
         </FormField>
         <div className="flex gap-3 pt-2">
           <Button variant="outline" onClick={onCancel} className="flex-1">
@@ -461,25 +488,6 @@ function EditStockOut({
             </SelectContent>
           </Select>
         </FormField>
-        <FormField label="Weight">
-          <div className="relative">
-            <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.weight}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, weight: e.target.value }))
-              }
-              placeholder="0.00"
-              className="pl-9 pr-10"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-              g
-            </span>
-          </div>
-        </FormField>
         <FormField label="Given To">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -508,6 +516,36 @@ function EditStockOut({
             </Select>
           </div>
         </FormField>
+        <FormField label="Given Weight">
+          <div className="relative">
+            <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.weight}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, weight: e.target.value }))
+              }
+              placeholder="0.00"
+              className="pl-9 pr-10"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+              g
+            </span>
+          </div>
+        </FormField>
+        <FormField label="Remarks">
+          <Textarea
+            value={form.remarks ?? ""}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, remarks: e.target.value }))
+            }
+            placeholder="Any additional notes..."
+            className="resize-none"
+            rows={3}
+          />
+        </FormField>
         <div className="flex gap-3 pt-2">
           <Button variant="outline" onClick={onCancel} className="flex-1">
             Cancel
@@ -530,19 +568,188 @@ function EditStockOut({
   );
 }
 
+function EditExchangeNewOrder({
+  entry,
+  onSave,
+  onCancel,
+}: { entry: ExchangeNewOrderEntry } & Omit<EditFormProps, "entry">) {
+  const [form, setForm] = useState({ ...entry });
+  return (
+    <FormCard>
+      <div className="flex items-center justify-between mb-4">
+        <SectionHeading
+          icon={<RefreshCw />}
+          title="Edit Exchange for New Order"
+          subtitle="Update exchange order information"
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onCancel}
+          className="shrink-0"
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="space-y-5">
+        <FormField label="Date">
+          <div className="relative">
+            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+              className="pl-9"
+            />
+          </div>
+        </FormField>
+        <FormField label="Bill No.">
+          <div className="relative">
+            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              value={form.billNo}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, billNo: e.target.value }))
+              }
+              placeholder="Enter bill number"
+              className="pl-9"
+            />
+          </div>
+        </FormField>
+        <FormField label="Material">
+          <Select
+            value={form.material}
+            onValueChange={(v) =>
+              setForm((p) => ({ ...p, material: v as StockMaterial }))
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gold">Gold</SelectItem>
+              <SelectItem value="silver">Silver</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
+        <FormField label="Scrap Weight">
+          <div className="relative">
+            <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.scrapWeight}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, scrapWeight: e.target.value }))
+              }
+              placeholder="0.00"
+              className="pl-9 pr-10"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+              g
+            </span>
+          </div>
+        </FormField>
+        <FormField label="Given Pure Weight">
+          <div className="relative">
+            <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.givenPureWeight}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, givenPureWeight: e.target.value }))
+              }
+              placeholder="0.00"
+              className="pl-9 pr-10"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+              g
+            </span>
+          </div>
+        </FormField>
+        <FormField label="Market Rate (per gram)">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground pointer-events-none">
+              ₹
+            </span>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.marketRate}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, marketRate: e.target.value }))
+              }
+              placeholder="0.00"
+              className="pl-7"
+            />
+          </div>
+        </FormField>
+        <FormField label="Remarks">
+          <Textarea
+            value={form.remarks}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, remarks: e.target.value }))
+            }
+            placeholder="Any additional notes..."
+            className="resize-none"
+            rows={3}
+          />
+        </FormField>
+        <div className="flex gap-3 pt-2">
+          <Button variant="outline" onClick={onCancel} className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onSave(form)}
+            className="flex-1 font-medium shadow-gold-sm"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.75 0.148 65), oklch(0.65 0.14 52))",
+              color: "oklch(0.12 0.025 45)",
+              border: "1px solid oklch(0.68 0.14 58)",
+            }}
+          >
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    </FormCard>
+  );
+}
+
+type TypeFilter = "all" | StockEntry["type"];
+
+const TYPE_FILTER_OPTIONS: { value: TypeFilter; label: string }[] = [
+  { value: "all", label: "All Types" },
+  { value: "raw_stock", label: "Raw Stock Bought" },
+  { value: "exchange_new_order", label: "Exchange Orders" },
+  { value: "buyback", label: "Buy from Customer" },
+  { value: "stock_out", label: "Stock Out" },
+];
+
 export default function StockRecordsList() {
   const { entries, removeEntry, updateEntry } = useStock();
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const filtered = entries.filter((e) => {
+    if (typeFilter !== "all" && e.type !== typeFilter) return false;
     const q = search.toLowerCase();
     return (
       typeLabel(e.type).toLowerCase().includes(q) ||
       e.material.toLowerCase().includes(q) ||
       e.date.includes(q) ||
-      ("givenTo" in e && (e as StockOutEntry).givenTo.toLowerCase().includes(q))
+      ("givenTo" in e &&
+        (e as StockOutEntry).givenTo.toLowerCase().includes(q)) ||
+      ("billNo" in e &&
+        (e as ExchangeNewOrderEntry).billNo.toLowerCase().includes(q))
     );
   });
 
@@ -596,6 +803,13 @@ export default function StockRecordsList() {
                 onCancel={() => setEditingId(null)}
               />
             )}
+            {editingEntry.type === "exchange_new_order" && (
+              <EditExchangeNewOrder
+                entry={editingEntry as ExchangeNewOrderEntry}
+                onSave={(changes) => handleSave(editingEntry.id, changes)}
+                onCancel={() => setEditingId(null)}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -604,8 +818,8 @@ export default function StockRecordsList() {
       {!editingEntry && (
         <>
           {entries.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[160px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   data-ocid="stock.search_input"
@@ -615,6 +829,24 @@ export default function StockRecordsList() {
                   className="pl-9 bg-card border-border"
                 />
               </div>
+              <Select
+                value={typeFilter}
+                onValueChange={(v) => setTypeFilter(v as TypeFilter)}
+              >
+                <SelectTrigger
+                  className="w-[180px] shrink-0 bg-card border-border"
+                  data-ocid="stock.type_filter.select"
+                >
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_FILTER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -672,11 +904,13 @@ export default function StockRecordsList() {
                   />
                 </div>
                 <h3 className="font-display text-base font-semibold text-foreground mb-1">
-                  {search ? "No results found" : "No stock entries yet"}
+                  {search || typeFilter !== "all"
+                    ? "No results found"
+                    : "No stock entries yet"}
                 </h3>
                 <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  {search
-                    ? "Try a different search term."
+                  {search || typeFilter !== "all"
+                    ? "Try a different search term or filter."
                     : "Use the form above to add your first stock entry."}
                 </p>
               </div>
@@ -695,7 +929,7 @@ export default function StockRecordsList() {
                     } hover:bg-accent/30 transition-colors duration-150`}
                   >
                     {/* Type badge */}
-                    <div className="min-w-[90px]">
+                    <div className="min-w-[110px]">
                       <Badge
                         variant="outline"
                         className={`text-xs font-semibold border ${typeBadgeClass(entry.type)}`}
@@ -739,6 +973,16 @@ export default function StockRecordsList() {
                           <>
                             Weight: {(entry as StockOutEntry).weight || "–"} g |
                             To: {(entry as StockOutEntry).givenTo || "–"}
+                          </>
+                        )}
+                        {entry.type === "exchange_new_order" && (
+                          <>
+                            Bill:{" "}
+                            {(entry as ExchangeNewOrderEntry).billNo || "–"} |
+                            Scrap:{" "}
+                            {(entry as ExchangeNewOrderEntry).scrapWeight ||
+                              "–"}{" "}
+                            g
                           </>
                         )}
                       </span>

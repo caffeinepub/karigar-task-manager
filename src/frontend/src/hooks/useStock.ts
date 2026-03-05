@@ -3,8 +3,8 @@ import { useActor } from "./useActor";
 import { SENTINEL_STOCK, readSentinel, writeSentinel } from "./useSentinel";
 
 export type StockDirection = "in" | "out";
-export type StockInType = "buyback" | "raw_stock";
-export type StockItem = "resale" | "scrap";
+export type StockInType = "buyback" | "raw_stock" | "exchange_new_order";
+export type StockItem = "resale" | "scrap" | "refine";
 export type StockMaterial = "gold" | "silver";
 
 export interface BuybackEntry {
@@ -30,6 +30,7 @@ export interface RawStockEntry {
   weight: string;
   currentRate: string;
   amount: string;
+  remarks: string;
   createdAt: number;
 }
 
@@ -40,10 +41,28 @@ export interface StockOutEntry {
   material: StockMaterial;
   weight: string;
   givenTo: string;
+  remarks: string;
   createdAt: number;
 }
 
-export type StockEntry = BuybackEntry | RawStockEntry | StockOutEntry;
+export interface ExchangeNewOrderEntry {
+  id: string;
+  type: "exchange_new_order";
+  date: string;
+  billNo: string;
+  material: StockMaterial;
+  scrapWeight: string;
+  givenPureWeight: string;
+  marketRate: string;
+  remarks: string;
+  createdAt: number;
+}
+
+export type StockEntry =
+  | BuybackEntry
+  | RawStockEntry
+  | StockOutEntry
+  | ExchangeNewOrderEntry;
 
 const STORAGE_KEY = "karigar_stock";
 

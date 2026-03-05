@@ -63,6 +63,7 @@ import {
 import { isSentinelRecord } from "../hooks/useSentinel";
 import {
   type BuybackEntry,
+  type ExchangeNewOrderEntry,
   type StockOutEntry,
   useStock,
 } from "../hooks/useStock";
@@ -70,6 +71,7 @@ import {
   exportJobRecordsExcel,
   exportJobRecordsPDF,
 } from "../utils/exportData";
+import BackupRestore from "./BackupRestore";
 import EmployeeForm from "./EmployeeForm";
 import JobDetailModal from "./JobDetailModal";
 
@@ -280,6 +282,12 @@ export default function RecordsList({
               <span className="hidden sm:inline">Stock</span>
               <span className="sm:hidden">Stock</span>
             </Button>
+            <BackupRestore
+              jobs={records}
+              stockEntries={stockEntries}
+              expenses={expenses}
+              exchangeScrap={exchangeScrapEntries}
+            />
             <Button
               onClick={onNewJob}
               className="gap-2 font-medium shadow-gold-sm"
@@ -375,14 +383,17 @@ export default function RecordsList({
                 {
                   label: "Stock In",
                   value: stockEntries.filter(
-                    (e) => e.type === "buyback" || e.type === "raw_stock",
+                    (e) =>
+                      e.type === "buyback" ||
+                      e.type === "raw_stock" ||
+                      e.type === "exchange_new_order",
                   ).length,
-                  sub: "buyback + raw",
+                  sub: "bought + exchange",
                   icon: <ArrowDownToLine className="w-4 h-4" />,
                   color: "oklch(0.55 0.14 155)",
                 },
                 {
-                  label: "Buyback",
+                  label: "Buy from Customer",
                   value: stockEntries.filter((e) => e.type === "buyback")
                     .length,
                   sub: "entries",
@@ -442,7 +453,9 @@ export default function RecordsList({
                 ).map(({ material, label, color, bg, border }) => {
                   const inCount = stockEntries.filter(
                     (e) =>
-                      (e.type === "buyback" || e.type === "raw_stock") &&
+                      (e.type === "buyback" ||
+                        e.type === "raw_stock" ||
+                        e.type === "exchange_new_order") &&
                       e.material === material,
                   ).length;
                   const outCount = stockEntries.filter(
@@ -452,16 +465,24 @@ export default function RecordsList({
                   const inWeight = stockEntries
                     .filter(
                       (e) =>
-                        (e.type === "buyback" || e.type === "raw_stock") &&
+                        (e.type === "buyback" ||
+                          e.type === "raw_stock" ||
+                          e.type === "exchange_new_order") &&
                         e.material === material,
                     )
                     .reduce((sum, e) => {
                       const w =
                         e.type === "buyback"
-                          ? Number.parseFloat(e.givenPureWeight) || 0
-                          : e.type === "raw_stock"
-                            ? Number.parseFloat(e.weight) || 0
-                            : 0;
+                          ? Number.parseFloat(
+                              (e as BuybackEntry).givenPureWeight,
+                            ) || 0
+                          : e.type === "exchange_new_order"
+                            ? Number.parseFloat(
+                                (e as ExchangeNewOrderEntry).givenPureWeight,
+                              ) || 0
+                            : e.type === "raw_stock"
+                              ? Number.parseFloat(e.weight) || 0
+                              : 0;
                       return sum + w;
                     }, 0);
 
