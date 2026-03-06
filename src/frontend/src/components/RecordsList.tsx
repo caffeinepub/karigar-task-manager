@@ -39,7 +39,6 @@ import {
   Pencil,
   Plus,
   Receipt,
-  Repeat,
   Search,
   Trash2,
   TrendingDown,
@@ -48,10 +47,6 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  type ExchangeScrapEntry,
-  useExchangeScrap,
-} from "../hooks/useExchangeScrap";
 import { type ExpenseRecord, useExpenses } from "../hooks/useExpenses";
 import {
   JobType,
@@ -83,7 +78,6 @@ interface Props {
   onEditRecord: (r: LocalJobRecord) => void;
   onStock: () => void;
   onExpenses: () => void;
-  onExchangeScrap: () => void;
 }
 
 type SortColumn =
@@ -144,7 +138,6 @@ export default function RecordsList({
   onEditRecord,
   onStock,
   onExpenses,
-  onExchangeScrap,
 }: Props) {
   const { data: rawRecords = [], isLoading } = useGetAllJobRecords();
   // Filter out any sentinel records that may slip through (extra safety)
@@ -154,7 +147,6 @@ export default function RecordsList({
   const deleteMutation = useDeleteJobRecord();
   const { entries: stockEntries } = useStock();
   const { expenses } = useExpenses();
-  const { exchangeScrapEntries } = useExchangeScrap();
   const [deleteTarget, setDeleteTarget] = useState<bigint | null>(null);
   const [search, setSearch] = useState("");
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
@@ -265,16 +257,6 @@ export default function RecordsList({
             </Button>
             <Button
               variant="outline"
-              onClick={onExchangeScrap}
-              className="gap-2 font-medium border-border hover:bg-accent/50"
-              data-ocid="header.exchange_scrap_button"
-            >
-              <Repeat className="w-4 h-4" />
-              <span className="hidden sm:inline">Exchange Scrap</span>
-              <span className="sm:hidden">Exch</span>
-            </Button>
-            <Button
-              variant="outline"
               onClick={onStock}
               className="gap-2 font-medium border-border hover:bg-accent/50"
             >
@@ -286,7 +268,6 @@ export default function RecordsList({
               jobs={records}
               stockEntries={stockEntries}
               expenses={expenses}
-              exchangeScrap={exchangeScrapEntries}
             />
             <Button
               onClick={onNewJob}
@@ -573,12 +554,6 @@ export default function RecordsList({
 
           {/* Expense Totals card */}
           <ExpenseTotalsCard expenses={expenses} onExpenses={onExpenses} />
-
-          {/* Exchange Scrap card */}
-          <ExchangeScrapCard
-            exchangeScrapEntries={exchangeScrapEntries}
-            onExchangeScrap={onExchangeScrap}
-          />
         </motion.div>
 
         {/* Search + Export */}
@@ -1049,163 +1024,5 @@ function EmptyState({
         </>
       )}
     </div>
-  );
-}
-
-function ExchangeScrapCard({
-  exchangeScrapEntries,
-  onExchangeScrap,
-}: {
-  exchangeScrapEntries: ExchangeScrapEntry[];
-  onExchangeScrap: () => void;
-}) {
-  const totalExchScrap = exchangeScrapEntries.reduce(
-    (sum, e) => sum + (Number.parseFloat(e.exchangeScrapWeight) || 0),
-    0,
-  );
-  const totalGivenPure = exchangeScrapEntries.reduce(
-    (sum, e) => sum + (Number.parseFloat(e.givenPureWeight) || 0),
-    0,
-  );
-  const resaleEntries = exchangeScrapEntries.filter(
-    (e) => e.oldScrap === "resale",
-  );
-  const refineEntries = exchangeScrapEntries.filter(
-    (e) => e.oldScrap === "refine",
-  );
-  const resaleScrapWt = resaleEntries.reduce(
-    (sum, e) => sum + (Number.parseFloat(e.exchangeScrapWeight) || 0),
-    0,
-  );
-  const refineScrapWt = refineEntries.reduce(
-    (sum, e) => sum + (Number.parseFloat(e.exchangeScrapWeight) || 0),
-    0,
-  );
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.32, duration: 0.4 }}
-      className="rounded-xl border border-border bg-card shadow-warm overflow-hidden"
-    >
-      {/* Section header */}
-      <button
-        type="button"
-        onClick={onExchangeScrap}
-        className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-accent/30 transition-colors duration-150"
-        data-ocid="dashboard.exchange_scrap_card_button"
-      >
-        <div className="flex items-center gap-2">
-          <Repeat
-            className="w-4 h-4"
-            style={{ color: "oklch(0.55 0.14 240)" }}
-          />
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Exchange Scrap
-          </span>
-        </div>
-        <span className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-          View All →
-        </span>
-      </button>
-
-      {/* Stats tiles */}
-      <div className="grid grid-cols-3 divide-x divide-border">
-        {[
-          {
-            label: "Total Entries",
-            value: exchangeScrapEntries.length.toString(),
-            sub: "records",
-            color: "oklch(0.55 0.14 240)",
-          },
-          {
-            label: "Total Exch. Scrap",
-            value: `${totalExchScrap.toFixed(2)}g`,
-            sub: "scrap weight",
-            color: "oklch(0.55 0.14 155)",
-          },
-          {
-            label: "Total Given Pure",
-            value: `${totalGivenPure.toFixed(2)}g`,
-            sub: "pure weight",
-            color: "oklch(0.72 0.148 60)",
-          },
-        ].map((stat) => (
-          <div key={stat.label} className="p-4">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1 truncate">
-              {stat.label}
-            </p>
-            <p
-              className="font-display text-2xl font-bold leading-none mb-0.5"
-              style={{ color: stat.color }}
-            >
-              {stat.value}
-            </p>
-            <p className="text-xs text-muted-foreground">{stat.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Resale vs Refine breakdown */}
-      <div className="border-t border-border px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          Old Scrap Breakdown
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          {(
-            [
-              {
-                type: "resale" as const,
-                label: "Resale",
-                count: resaleEntries.length,
-                weight: resaleScrapWt,
-                color: "oklch(0.45 0.14 155)",
-                bg: "oklch(0.55 0.14 155 / 0.08)",
-                border: "oklch(0.55 0.14 155 / 0.25)",
-              },
-              {
-                type: "refine" as const,
-                label: "Refine",
-                count: refineEntries.length,
-                weight: refineScrapWt,
-                color: "oklch(0.45 0.14 240)",
-                bg: "oklch(0.55 0.14 240 / 0.08)",
-                border: "oklch(0.55 0.14 240 / 0.25)",
-              },
-            ] as const
-          ).map(({ label, count, weight, color, bg, border }) => (
-            <div
-              key={label}
-              className="rounded-lg px-3 py-2.5"
-              style={{ background: bg, border: `1px solid ${border}` }}
-            >
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Circle
-                  className="w-3 h-3 shrink-0 fill-current"
-                  style={{ color }}
-                />
-                <p
-                  className="text-sm font-semibold leading-tight"
-                  style={{ color }}
-                >
-                  {label}
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Entries:{" "}
-                <span className="font-medium text-foreground">{count}</span>
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Scrap Wt:{" "}
-                <span className="font-medium text-foreground">
-                  {weight.toFixed(2)}g
-                </span>
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </motion.div>
   );
 }

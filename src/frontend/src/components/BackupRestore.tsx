@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ExchangeScrapEntry } from "../hooks/useExchangeScrap";
 import type { ExpenseRecord } from "../hooks/useExpenses";
 import type { LocalJobRecord } from "../hooks/useQueries";
 import type { StockEntry } from "../hooks/useStock";
@@ -45,7 +44,6 @@ interface BackupRestoreProps {
   jobs?: LocalJobRecord[];
   stockEntries?: StockEntry[];
   expenses?: ExpenseRecord[];
-  exchangeScrap?: ExchangeScrapEntry[];
 }
 
 function bigIntReplacer(_key: string, value: unknown): unknown {
@@ -66,14 +64,13 @@ export default function BackupRestore({
   jobs = [],
   stockEntries = [],
   expenses = [],
-  exchangeScrap = [],
 }: BackupRestoreProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingRestore, setPendingRestore] = useState<BackupData | null>(null);
 
   function handleExportAllExcel() {
     try {
-      exportAllDataExcel({ jobs, stockEntries, expenses, exchangeScrap });
+      exportAllDataExcel({ jobs, stockEntries, expenses, exchangeScrap: [] });
       toast.success("Full data exported as Excel");
     } catch {
       toast.error("Export failed. Please try again.");
@@ -82,7 +79,7 @@ export default function BackupRestore({
 
   function handleExportAllPDF() {
     try {
-      exportAllDataPDF({ jobs, stockEntries, expenses, exchangeScrap });
+      exportAllDataPDF({ jobs, stockEntries, expenses, exchangeScrap: [] });
       toast.success("Full data exported as PDF");
     } catch {
       toast.error("Export failed. Please try again.");
@@ -269,11 +266,6 @@ export default function BackupRestore({
               </strong>
               ,{" "}
               <strong>{pendingRestore?.expenses?.length ?? 0} expenses</strong>,{" "}
-              <strong>
-                {pendingRestore?.exchangeScrap?.length ?? 0} exchange scrap
-                entries
-              </strong>
-              ,{" "}
               <strong>
                 {pendingRestore?.employees?.length ?? 0} employees
               </strong>

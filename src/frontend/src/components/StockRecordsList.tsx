@@ -723,6 +723,7 @@ function EditExchangeNewOrder({
 }
 
 type TypeFilter = "all" | StockEntry["type"];
+type MaterialFilter = "all" | StockMaterial;
 
 const TYPE_FILTER_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: "all", label: "All Types" },
@@ -732,15 +733,23 @@ const TYPE_FILTER_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: "stock_out", label: "Stock Out" },
 ];
 
+const MATERIAL_FILTER_OPTIONS: { value: MaterialFilter; label: string }[] = [
+  { value: "all", label: "All Materials" },
+  { value: "gold", label: "Gold" },
+  { value: "silver", label: "Silver" },
+];
+
 export default function StockRecordsList() {
   const { entries, removeEntry, updateEntry } = useStock();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [materialFilter, setMaterialFilter] = useState<MaterialFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const filtered = entries.filter((e) => {
     if (typeFilter !== "all" && e.type !== typeFilter) return false;
+    if (materialFilter !== "all" && e.material !== materialFilter) return false;
     const q = search.toLowerCase();
     return (
       typeLabel(e.type).toLowerCase().includes(q) ||
@@ -847,6 +856,24 @@ export default function StockRecordsList() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select
+                value={materialFilter}
+                onValueChange={(v) => setMaterialFilter(v as MaterialFilter)}
+              >
+                <SelectTrigger
+                  className="w-[150px] shrink-0 bg-card border-border"
+                  data-ocid="stock.material_filter.select"
+                >
+                  <SelectValue placeholder="All Materials" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MATERIAL_FILTER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -904,12 +931,12 @@ export default function StockRecordsList() {
                   />
                 </div>
                 <h3 className="font-display text-base font-semibold text-foreground mb-1">
-                  {search || typeFilter !== "all"
+                  {search || typeFilter !== "all" || materialFilter !== "all"
                     ? "No results found"
                     : "No stock entries yet"}
                 </h3>
                 <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  {search || typeFilter !== "all"
+                  {search || typeFilter !== "all" || materialFilter !== "all"
                     ? "Try a different search term or filter."
                     : "Use the form above to add your first stock entry."}
                 </p>
